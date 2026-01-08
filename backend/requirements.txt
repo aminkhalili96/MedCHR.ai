@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-dotenv
+psycopg[binary]
+pgvector
+supabase
+python-multipart
+pdfplumber
+pytesseract
+pillow
+openai
+tenacity
+jinja2
+itsdangerous
+markdown

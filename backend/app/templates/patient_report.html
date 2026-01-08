@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+    /* Patient-Friendly Report Styles */
+    .patient-report {
+        background: #ffffff;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 48px;
+        border-radius: 16px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    .patient-header {
+        text-align: center;
+        padding-bottom: 32px;
+        border-bottom: 2px solid #f0f0f0;
+        margin-bottom: 32px;
+    }
+
+    .patient-header h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1a1a1a;
+        margin: 0 0 8px 0;
+    }
+
+    .patient-header .subtitle {
+        color: #6b6b6b;
+        font-size: 14px;
+    }
+
+    .section {
+        margin-bottom: 32px;
+    }
+
+    .section-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #d97756;
+        margin: 0 0 16px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .section-title .icon {
+        font-size: 20px;
+    }
+
+    /* Summary Card */
+    .summary-card {
+        background: linear-gradient(135deg, #fef4f1 0%, #fff 100%);
+        border: 1px solid #f5e6df;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 24px;
+    }
+
+    .summary-card p {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.8;
+        color: #333;
+    }
+
+    /* Key Points */
+    .key-points {
+        display: grid;
+        gap: 12px;
+    }
+
+    .key-point {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 16px;
+        background: #faf9f6;
+        border-radius: 8px;
+        border-left: 3px solid #d97756;
+    }
+
+    .key-point .bullet {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #d97756;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 600;
+        flex-shrink: 0;
+    }
+
+    .key-point p {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #333;
+    }
+
+    /* Biomarker Visual */
+    .biomarker-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+
+    .biomarker-card {
+        background: #fff;
+        border: 1px solid #e8e4df;
+        border-radius: 10px;
+        padding: 16px;
+        text-align: center;
+    }
+
+    .biomarker-card .name {
+        font-size: 12px;
+        color: #9b9b9b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+    }
+
+    .biomarker-card .value {
+        font-size: 24px;
+        font-weight: 700;
+        color: #1a1a1a;
+    }
+
+    .biomarker-card .unit {
+        font-size: 12px;
+        color: #6b6b6b;
+    }
+
+    .biomarker-card .status {
+        margin-top: 8px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    .status-normal {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+
+    .status-high {
+        background: #fef3c7;
+        color: #ca8a04;
+    }
+
+    .status-low {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
+    /* Recommendations */
+    .recommendations {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 12px;
+        padding: 24px;
+    }
+
+    .recommendations h3 {
+        color: #16a34a;
+        margin: 0 0 16px 0;
+        font-size: 16px;
+    }
+
+    .recommendations ul {
+        margin: 0;
+        padding-left: 20px;
+    }
+
+    .recommendations li {
+        margin-bottom: 8px;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    /* Lifestyle */
+    .lifestyle-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+    }
+
+    .lifestyle-item {
+        background: #faf9f6;
+        border-radius: 8px;
+        padding: 12px 16px;
+        text-align: center;
+    }
+
+    .lifestyle-item .label {
+        font-size: 11px;
+        color: #9b9b9b;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+
+    .lifestyle-item .value {
+        font-size: 14px;
+        font-weight: 500;
+        color: #1a1a1a;
+    }
+
+    /* Footer */
+    .patient-footer {
+        margin-top: 40px;
+        padding-top: 24px;
+        border-top: 1px solid #e8e4df;
+        text-align: center;
+        font-size: 12px;
+        color: #9b9b9b;
+    }
+
+    .no-print {}
+
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+
+        .patient-report {
+            box-shadow: none;
+            padding: 0;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="no-print"
+    style="max-width: 800px; margin: 0 auto 24px; display: flex; justify-content: space-between; align-items: center;">
+    <a href="/ui/patients/{{ patient.id }}/report" style="color: #6b6b6b; font-size: 13px; text-decoration: none;">←
+        Back to Full Report</a>
+    <button onclick="window.print()"
+        style="background: #1a1a1a; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 13px; cursor: pointer;">
+        🖨️ Print for Patient
+    </button>
+</div>
+
+<div class="patient-report">
+    <div class="patient-header">
+        <h1>Your Health Summary</h1>
+        <p class="subtitle">Prepared for {{ patient.full_name }} on {{ (draft.created_at|string)[:10] if draft and
+            draft.created_at else "N/A" }}</p>
+    </div>
+
+    <!-- Overview -->
+    <div class="section">
+        <h2 class="section-title"><span class="icon">📋</span> Overview</h2>
+        <div class="summary-card">
+            <p>
+                This report summarizes your recent health data from {{ documents|length }} medical document(s).
+                {% if findings %}{{ findings|length }} biomarker(s) were flagged for attention.{% endif %}
+                Please discuss any questions with your healthcare provider.
+            </p>
+        </div>
+    </div>
+
+    <!-- Key Findings (Plain Language) -->
+    {% if findings %}
+    <div class="section">
+        <h2 class="section-title"><span class="icon">🔍</span> Key Findings</h2>
+        <div class="key-points">
+            {% for finding in findings[:5] %}
+            <div class="key-point">
+                <span class="bullet">{{ loop.index }}</span>
+                <p>{{ finding }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Biomarker Highlights -->
+    {% if labs %}
+    <div class="section">
+        <h2 class="section-title"><span class="icon">🧪</span> Your Lab Results</h2>
+        <div class="biomarker-grid">
+            {% for lab in labs[:6] %}
+            <div class="biomarker-card">
+                <div class="name">{{ lab.test }}</div>
+                <div class="value">{{ lab.value }} <span class="unit">{{ lab.unit }}</span></div>
+                <span
+                    class="status {% if lab.flag == 'High' %}status-high{% elif lab.flag == 'Low' %}status-low{% else %}status-normal{% endif %}">
+                    {% if lab.flag == 'High' %}Above Range{% elif lab.flag == 'Low' %}Below Range{% else %}Normal{%
+                    endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Lifestyle Summary -->
+    {% if patient.lifestyle and (patient.lifestyle.diet or patient.lifestyle.exercise or
+    patient.lifestyle.sleep_quality) %}
+    <div class="section">
+        <h2 class="section-title"><span class="icon">🏃</span> Your Lifestyle Profile</h2>
+        <div class="lifestyle-grid">
+            {% if patient.lifestyle.diet %}
+            <div class="lifestyle-item">
+                <div class="label">Diet</div>
+                <div class="value">{{ patient.lifestyle.diet|title }}</div>
+            </div>
+            {% endif %}
+            {% if patient.lifestyle.exercise %}
+            <div class="lifestyle-item">
+                <div class="label">Exercise</div>
+                <div class="value">{{ patient.lifestyle.exercise|title }}</div>
+            </div>
+            {% endif %}
+            {% if patient.lifestyle.sleep_quality %}
+            <div class="lifestyle-item">
+                <div class="label">Sleep</div>
+                <div class="value">{{ patient.lifestyle.sleep_quality|title }}</div>
+            </div>
+            {% endif %}
+            {% if patient.lifestyle.stress_level %}
+            <div class="lifestyle-item">
+                <div class="label">Stress Level</div>
+                <div class="value">{{ patient.lifestyle.stress_level }}/10</div>
+            </div>
+            {% endif %}
+            {% if patient.lifestyle.smoking %}
+            <div class="lifestyle-item">
+                <div class="label">Smoking</div>
+                <div class="value">{{ patient.lifestyle.smoking|replace('_', ' ')|title }}</div>
+            </div>
+            {% endif %}
+            {% if patient.lifestyle.alcohol %}
+            <div class="lifestyle-item">
+                <div class="label">Alcohol</div>
+                <div class="value">{{ patient.lifestyle.alcohol|title }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recommendations (if diagnoses available) -->
+    {% if diagnoses %}
+    <div class="section">
+        <h2 class="section-title"><span class="icon">💡</span> What This Means</h2>
+        <div class="recommendations">
+            <h3>Based on your results:</h3>
+            <ul>
+                {% for dx in diagnoses[:4] %}
+                <li>{{ dx }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Next Steps -->
+    <div class="section">
+        <h2 class="section-title"><span class="icon">📅</span> Recommended Next Steps</h2>
+        <div class="key-points">
+            <div class="key-point">
+                <span class="bullet">1</span>
+                <p>Schedule a follow-up appointment with your healthcare provider to discuss these results.</p>
+            </div>
+            <div class="key-point">
+                <span class="bullet">2</span>
+                <p>Keep a record of any symptoms or changes you notice before your next visit.</p>
+            </div>
+            <div class="key-point">
+                <span class="bullet">3</span>
+                <p>Continue taking any prescribed medications as directed.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="patient-footer">
+        <p>This summary was prepared by MedCHR.ai and reviewed by your healthcare provider.</p>
+        <p>For questions, please contact your medical team.</p>
+    </div>
+</div>
+{% endblock %}

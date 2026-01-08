@@ -1,0 +1,109 @@
+<mxfile host="65bd71144e">
+    <diagram id="medchr-workflow" name="Workflow">
+        <mxGraphModel dx="803" dy="933" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="900" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="n1" value="Clinician&#10;User" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f2937;strokeColor=#9ca3af;fontColor=#f9fafb;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="80" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n2" value="Web App&#10;UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f2937;strokeColor=#9ca3af;fontColor=#f9fafb;" parent="1" vertex="1">
+                    <mxGeometry x="200" y="80" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n3" value="Auth&#10;+ RBAC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f2937;strokeColor=#9ca3af;fontColor=#f9fafb;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="80" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n4" value="API&#10;Backend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f2937;strokeColor=#9ca3af;fontColor=#f9fafb;" parent="1" vertex="1">
+                    <mxGeometry x="520" y="80" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n5" value="Upload&#10;+ Ingestion" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f2937;strokeColor=#9ca3af;fontColor=#f9fafb;" parent="1" vertex="1">
+                    <mxGeometry x="680" y="80" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n6" value="Text&#10;Extraction&#10;PDF Parse + OCR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f2937;strokeColor=#9ca3af;fontColor=#f9fafb;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="80" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n7" value="Structured&#10;Extract + Normalize" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f2937;strokeColor=#9ca3af;fontColor=#f9fafb;" parent="1" vertex="1">
+                    <mxGeometry x="1000" y="80" width="160" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n8" value="CHR&#10;Draft&#10;RAG + LLM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f2937;strokeColor=#9ca3af;fontColor=#f9fafb;" parent="1" vertex="1">
+                    <mxGeometry x="1180" y="80" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n9" value="Review&#10;+ Sign-off" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f2937;strokeColor=#9ca3af;fontColor=#f9fafb;" parent="1" vertex="1">
+                    <mxGeometry x="1340" y="80" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n10" value="Export&#10;+ Share" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f2937;strokeColor=#9ca3af;fontColor=#f9fafb;" parent="1" vertex="1">
+                    <mxGeometry x="1500" y="80" width="140" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" style="endArrow=block;html=1;strokeColor=#9ca3af;" parent="1" source="n1" target="n2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" style="endArrow=block;html=1;strokeColor=#9ca3af;" parent="1" source="n2" target="n3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" style="endArrow=block;html=1;strokeColor=#9ca3af;" parent="1" source="n3" target="n4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e4" style="endArrow=block;html=1;strokeColor=#9ca3af;" parent="1" source="n4" target="n5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e5" style="endArrow=block;html=1;strokeColor=#9ca3af;" parent="1" source="n5" target="n6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e6" style="endArrow=block;html=1;strokeColor=#9ca3af;" parent="1" source="n6" target="n7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e7" style="endArrow=block;html=1;strokeColor=#9ca3af;" parent="1" source="n7" target="n8" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e8" style="endArrow=block;html=1;strokeColor=#9ca3af;" parent="1" source="n8" target="n9" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e9" style="endArrow=block;html=1;strokeColor=#9ca3af;" parent="1" source="n9" target="n10" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl1" value="AI Services" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#a3b1c6;" parent="1" vertex="1">
+                    <mxGeometry x="880" y="190" width="120" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="lbl2" value="Data Stores" style="text;html=1;strokeColor=none;fillColor=none;fontColor=#a3b1c6;" parent="1" vertex="1">
+                    <mxGeometry x="860" y="360" width="120" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="ai1" value="OCR&#10;Engine" style="ellipse;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=#64748b;fontColor=#e5e7eb;" parent="1" vertex="1">
+                    <mxGeometry x="880" y="205" width="80" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="ai2" value="NER&#10;Parsers" style="ellipse;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=#64748b;fontColor=#e5e7eb;" parent="1" vertex="1">
+                    <mxGeometry x="1040" y="210" width="80" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="ai3" value="LLM&#10;RAG" style="ellipse;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=#64748b;fontColor=#e5e7eb;" parent="1" vertex="1">
+                    <mxGeometry x="1140" y="210" width="80" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="ds1" value="Postgres&#10;patients + audit" style="shape=cylinder;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=#64748b;fontColor=#e5e7eb;" parent="1" vertex="1">
+                    <mxGeometry x="530" y="220" width="120" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="ds2" value="Object&#10;Storage" style="shape=cylinder;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=#64748b;fontColor=#e5e7eb;" parent="1" vertex="1">
+                    <mxGeometry x="690" y="220" width="120" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="ds3" value="pgvector&#10;Embeddings" style="shape=cylinder;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=#64748b;fontColor=#e5e7eb;" parent="1" vertex="1">
+                    <mxGeometry x="1260" y="215" width="120" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="d1" style="dashed=1;endArrow=block;html=1;strokeColor=#64748b;" parent="1" source="n6" target="ai1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="d2" style="dashed=1;endArrow=block;html=1;strokeColor=#64748b;" parent="1" source="n7" target="ai2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="d3" style="dashed=1;endArrow=block;html=1;strokeColor=#64748b;" parent="1" source="n8" target="ai3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="d4" style="dashed=1;endArrow=block;html=1;strokeColor=#64748b;" parent="1" source="n4" target="ds1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="d5" style="dashed=1;endArrow=block;html=1;strokeColor=#64748b;" parent="1" source="n5" target="ds2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="d6" style="dashed=1;endArrow=block;html=1;strokeColor=#64748b;" parent="1" source="n8" target="ds3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

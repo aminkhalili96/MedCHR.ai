@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="margin-bottom: 16px;">
+  <a href="/ui" style="color: var(--text-muted); font-size: 13px;">← Back to Patients</a>
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <div>
+    <h1 style="margin: 0; display: flex; align-items: center; gap: 12px;">
+      Embeddings Debug
+      <span class="badge" style="background: var(--warning); color: white;">Developer Tool</span>
+    </h1>
+    <p class="muted" style="margin: 4px 0 0 0;">View embedding counts by document for RAG debugging</p>
+  </div>
+</div>
+
+<div class="card" style="border: 1px dashed var(--warning); background: var(--warning-light);">
+  <p style="color: var(--text-secondary); margin: 0; font-size: 13px;">
+    ⚠️ This is a developer tool. Embeddings are automatically generated when documents are uploaded and processed.
+  </p>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Recent Embeddings</h3>
+    <span class="badge badge-neutral">{{ rows | length }} documents</span>
+  </div>
+  {% if rows %}
+  <table>
+    <thead>
+      <tr>
+        <th>Patient</th>
+        <th>Document</th>
+        <th>Chunks</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td style="font-weight: 500;">{{ row.full_name }}</td>
+        <td>{{ row.filename }}</td>
+        <td>
+          <span class="badge {% if row.chunk_count > 0 %}badge-success{% else %}badge-neutral{% endif %}">
+            {{ row.chunk_count }} chunks
+          </span>
+        </td>
+        <td class="muted">{{ row.created_at }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">🔍</div>
+    <p style="font-size: 14px; color: var(--text-secondary);">No embeddings yet</p>
+    <p style="font-size: 13px; color: var(--text-muted);">Upload and process documents to generate embeddings</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
