@@ -1,0 +1,72 @@
+name: Controls Evidence Report
+
+on:
+  schedule:
+    - cron: "0 10 1 * *"
+  workflow_dispatch:
+
+jobs:
+  generate-evidence:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: medchr
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/medchr
+      SUPABASE_URL: http://localhost
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.CI_SUPABASE_SERVICE_ROLE_KEY }}
+      APP_SECRET_KEY: ${{ secrets.CI_APP_SECRET_KEY }}
+      HIPAA_MODE: true
+      PHI_PROCESSORS: supabase
+      MFA_SECRET_KEY: ${{ secrets.CI_MFA_SECRET_KEY }}
+      API_KEYS: 00000000-0000-0000-0000-000000000000:${{ secrets.CI_TENANT_API_KEY }}
+      RETENTION_IMMUTABLE_DIR: data/retention_immutable
+      TRUST_PROXY_HEADERS: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+      - name: Apply migrations
+        run: |
+          python -m backend.scripts.init_db
+      - name: Run control validation gate
+        run: |
+          python -m backend.scripts.validate_controls \
+            --require-db \
+            --fail-on-failures \
+            --output-json data/control_reports/control_validation.json \
+            --output-markdown data/control_reports/control_validation.md
+      - name: Run backup/restore drill
+        run: |
+          python -m backend.scripts.backup_restore_drill --output-dir data/drills/backup_restore --fail-on-errors
+      - name: Generate evidence pack
+        run: |
+          python -m backend.scripts.generate_evidence_pack --output-dir data/evidence_packs --keep-latest 12
+      - name: Upload evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: controls-evidence
+          path: |
+            data/control_reports
+            data/drills/backup_restore
+            data/evidence_packs
+          retention-days: 90

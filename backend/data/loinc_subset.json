@@ -1,0 +1,409 @@
+{
+    "version": "1.0",
+    "description": "Subset of LOINC codes for common primary care labs",
+    "tests": [
+        {
+            "loinc": "2160-0",
+            "canonical": "Creatinine",
+            "aliases": [
+                "Creat",
+                "Cr",
+                "Serum Creatinine",
+                "S-Creatinine"
+            ]
+        },
+        {
+            "loinc": "3094-0",
+            "canonical": "BUN",
+            "aliases": [
+                "Blood Urea Nitrogen",
+                "Urea Nitrogen"
+            ]
+        },
+        {
+            "loinc": "33914-3",
+            "canonical": "eGFR",
+            "aliases": [
+                "Estimated GFR",
+                "Glomerular Filtration Rate",
+                "GFR"
+            ]
+        },
+        {
+            "loinc": "4548-4",
+            "canonical": "Hemoglobin A1c",
+            "aliases": [
+                "HbA1c",
+                "A1c",
+                "Glycated Hemoglobin",
+                "Glycohemoglobin"
+            ]
+        },
+        {
+            "loinc": "2345-7",
+            "canonical": "Glucose",
+            "aliases": [
+                "Blood Glucose",
+                "Serum Glucose",
+                "Fasting Glucose",
+                "Random Glucose"
+            ]
+        },
+        {
+            "loinc": "718-7",
+            "canonical": "Hemoglobin",
+            "aliases": [
+                "Hgb",
+                "HGB",
+                "Hb"
+            ]
+        },
+        {
+            "loinc": "787-2",
+            "canonical": "MCV",
+            "aliases": [
+                "Mean Corpuscular Volume"
+            ]
+        },
+        {
+            "loinc": "785-6",
+            "canonical": "MCH",
+            "aliases": [
+                "Mean Corpuscular Hemoglobin"
+            ]
+        },
+        {
+            "loinc": "786-4",
+            "canonical": "MCHC",
+            "aliases": [
+                "Mean Corpuscular Hemoglobin Concentration"
+            ]
+        },
+        {
+            "loinc": "6690-2",
+            "canonical": "WBC",
+            "aliases": [
+                "White Blood Cell Count",
+                "Leukocytes",
+                "White Count",
+                "WBC Count"
+            ]
+        },
+        {
+            "loinc": "777-3",
+            "canonical": "Platelets",
+            "aliases": [
+                "Platelet Count",
+                "Plt",
+                "PLT",
+                "Thrombocytes"
+            ]
+        },
+        {
+            "loinc": "789-8",
+            "canonical": "RBC",
+            "aliases": [
+                "Red Blood Cell Count",
+                "Erythrocytes",
+                "Red Count"
+            ]
+        },
+        {
+            "loinc": "2085-9",
+            "canonical": "HDL Cholesterol",
+            "aliases": [
+                "HDL",
+                "HDL-C",
+                "High Density Lipoprotein"
+            ]
+        },
+        {
+            "loinc": "2089-1",
+            "canonical": "LDL Cholesterol",
+            "aliases": [
+                "LDL",
+                "LDL-C",
+                "Low Density Lipoprotein"
+            ]
+        },
+        {
+            "loinc": "2571-8",
+            "canonical": "Triglycerides",
+            "aliases": [
+                "TG",
+                "Trigs"
+            ]
+        },
+        {
+            "loinc": "2093-3",
+            "canonical": "Total Cholesterol",
+            "aliases": [
+                "Cholesterol",
+                "TC"
+            ]
+        },
+        {
+            "loinc": "3016-3",
+            "canonical": "TSH",
+            "aliases": [
+                "Thyroid Stimulating Hormone",
+                "Thyrotropin"
+            ]
+        },
+        {
+            "loinc": "3026-2",
+            "canonical": "Free T4",
+            "aliases": [
+                "FT4",
+                "Thyroxine Free",
+                "Free Thyroxine"
+            ]
+        },
+        {
+            "loinc": "3053-6",
+            "canonical": "Free T3",
+            "aliases": [
+                "FT3",
+                "Triiodothyronine Free"
+            ]
+        },
+        {
+            "loinc": "1742-6",
+            "canonical": "ALT",
+            "aliases": [
+                "Alanine Aminotransferase",
+                "SGPT",
+                "GPT"
+            ]
+        },
+        {
+            "loinc": "1920-8",
+            "canonical": "AST",
+            "aliases": [
+                "Aspartate Aminotransferase",
+                "SGOT",
+                "GOT"
+            ]
+        },
+        {
+            "loinc": "1975-2",
+            "canonical": "Total Bilirubin",
+            "aliases": [
+                "Bilirubin",
+                "T. Bili",
+                "TBIL"
+            ]
+        },
+        {
+            "loinc": "6768-6",
+            "canonical": "Alkaline Phosphatase",
+            "aliases": [
+                "ALP",
+                "Alk Phos"
+            ]
+        },
+        {
+            "loinc": "1751-7",
+            "canonical": "Albumin",
+            "aliases": [
+                "Serum Albumin",
+                "Alb"
+            ]
+        },
+        {
+            "loinc": "2823-3",
+            "canonical": "Potassium",
+            "aliases": [
+                "K",
+                "K+",
+                "Serum Potassium"
+            ]
+        },
+        {
+            "loinc": "2951-2",
+            "canonical": "Sodium",
+            "aliases": [
+                "Na",
+                "Na+",
+                "Serum Sodium"
+            ]
+        },
+        {
+            "loinc": "2075-0",
+            "canonical": "Chloride",
+            "aliases": [
+                "Cl",
+                "Cl-",
+                "Serum Chloride"
+            ]
+        },
+        {
+            "loinc": "2028-9",
+            "canonical": "CO2",
+            "aliases": [
+                "Bicarbonate",
+                "HCO3",
+                "Carbon Dioxide"
+            ]
+        },
+        {
+            "loinc": "17861-6",
+            "canonical": "Calcium",
+            "aliases": [
+                "Ca",
+                "Serum Calcium"
+            ]
+        },
+        {
+            "loinc": "2777-1",
+            "canonical": "Phosphorus",
+            "aliases": [
+                "Phos",
+                "Phosphate",
+                "Inorganic Phosphorus"
+            ]
+        },
+        {
+            "loinc": "2276-4",
+            "canonical": "Ferritin",
+            "aliases": [
+                "Serum Ferritin"
+            ]
+        },
+        {
+            "loinc": "2498-4",
+            "canonical": "Iron",
+            "aliases": [
+                "Serum Iron",
+                "Fe"
+            ]
+        },
+        {
+            "loinc": "1988-5",
+            "canonical": "CRP",
+            "aliases": [
+                "C-Reactive Protein",
+                "C Reactive Protein",
+                "hs-CRP"
+            ]
+        },
+        {
+            "loinc": "4537-7",
+            "canonical": "ESR",
+            "aliases": [
+                "Erythrocyte Sedimentation Rate",
+                "Sed Rate"
+            ]
+        },
+        {
+            "loinc": "5902-2",
+            "canonical": "PT",
+            "aliases": [
+                "Prothrombin Time"
+            ]
+        },
+        {
+            "loinc": "6301-6",
+            "canonical": "INR",
+            "aliases": [
+                "International Normalized Ratio"
+            ]
+        },
+        {
+            "loinc": "3173-2",
+            "canonical": "PTT",
+            "aliases": [
+                "Partial Thromboplastin Time",
+                "aPTT"
+            ]
+        },
+        {
+            "loinc": "2532-0",
+            "canonical": "LDH",
+            "aliases": [
+                "Lactate Dehydrogenase"
+            ]
+        },
+        {
+            "loinc": "2324-2",
+            "canonical": "GGT",
+            "aliases": [
+                "Gamma-Glutamyl Transferase",
+                "Gamma GT"
+            ]
+        },
+        {
+            "loinc": "30341-2",
+            "canonical": "Reticulocyte Count",
+            "aliases": [
+                "Retics",
+                "Reticulocytes"
+            ]
+        },
+        {
+            "loinc": "49563-0",
+            "canonical": "FEV1",
+            "aliases": [
+                "Forced Expiratory Volume"
+            ]
+        },
+        {
+            "loinc": "19926-5",
+            "canonical": "FVC",
+            "aliases": [
+                "Forced Vital Capacity"
+            ]
+        },
+        {
+            "loinc": "19950-5",
+            "canonical": "FEV1/FVC",
+            "aliases": [
+                "FEV1/FVC Ratio"
+            ]
+        },
+        {
+            "loinc": "2458-8",
+            "canonical": "IgA",
+            "aliases": [
+                "Immunoglobulin A"
+            ]
+        },
+        {
+            "loinc": "2465-3",
+            "canonical": "IgG",
+            "aliases": [
+                "Immunoglobulin G"
+            ]
+        },
+        {
+            "loinc": "2472-9",
+            "canonical": "IgM",
+            "aliases": [
+                "Immunoglobulin M"
+            ]
+        },
+        {
+            "loinc": "5778-6",
+            "canonical": "Uric Acid",
+            "aliases": [
+                "Serum Uric Acid"
+            ]
+        },
+        {
+            "loinc": "1558-6",
+            "canonical": "Fasting Glucose",
+            "aliases": [
+                "FBG",
+                "Fasting Blood Glucose"
+            ]
+        },
+        {
+            "loinc": "14749-6",
+            "canonical": "Glucose Tolerance",
+            "aliases": [
+                "OGTT",
+                "Oral Glucose Tolerance Test"
+            ]
+        }
+    ]
+}

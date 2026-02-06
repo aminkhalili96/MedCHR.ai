@@ -1,0 +1,251 @@
+{
+    "version": "1.0",
+    "description": "Pharmacogenomics reference data for common gene-drug interactions",
+    "genes": [
+        {
+            "gene": "CYP2D6",
+            "variants": {
+                "*4/*4": {
+                    "phenotype": "Poor Metabolizer",
+                    "drugs_affected": [
+                        "Codeine",
+                        "Tramadol",
+                        "Oxycodone",
+                        "Paroxetine",
+                        "Fluoxetine",
+                        "Amitriptyline"
+                    ],
+                    "recommendation": "Avoid prodrugs (codeine/tramadol). Use alternative pain medications. Reduce doses of antidepressants metabolized by CYP2D6."
+                },
+                "*1/*4": {
+                    "phenotype": "Intermediate Metabolizer",
+                    "drugs_affected": [
+                        "Codeine",
+                        "Tramadol"
+                    ],
+                    "recommendation": "May have reduced efficacy of codeine. Consider alternatives or monitor closely."
+                },
+                "*1/*1": {
+                    "phenotype": "Normal Metabolizer",
+                    "drugs_affected": [],
+                    "recommendation": "Standard dosing appropriate."
+                },
+                "*1/*1xN": {
+                    "phenotype": "Ultra-Rapid Metabolizer",
+                    "drugs_affected": [
+                        "Codeine",
+                        "Tramadol"
+                    ],
+                    "recommendation": "AVOID codeine - risk of toxicity. Use morphine or non-opioid alternatives."
+                }
+            }
+        },
+        {
+            "gene": "CYP2C19",
+            "variants": {
+                "*2/*2": {
+                    "phenotype": "Poor Metabolizer",
+                    "drugs_affected": [
+                        "Clopidogrel",
+                        "Omeprazole",
+                        "Escitalopram"
+                    ],
+                    "recommendation": "Avoid clopidogrel (use prasugrel/ticagrelor). PPI dosing may need adjustment."
+                },
+                "*17/*17": {
+                    "phenotype": "Ultra-Rapid Metabolizer",
+                    "drugs_affected": [
+                        "Omeprazole",
+                        "Escitalopram"
+                    ],
+                    "recommendation": "May need higher PPI doses. Consider alternative antidepressants."
+                },
+                "*1/*1": {
+                    "phenotype": "Normal Metabolizer",
+                    "drugs_affected": [],
+                    "recommendation": "Standard dosing appropriate."
+                }
+            }
+        },
+        {
+            "gene": "MTHFR",
+            "variants": {
+                "C677T Homozygous": {
+                    "phenotype": "Reduced Enzyme Activity (30%)",
+                    "drugs_affected": [
+                        "Methotrexate"
+                    ],
+                    "recommendation": "Reduced methylation capacity. Consider supplementation with methylated B-vitamins (Methylfolate, Methyl-B12). Monitor homocysteine levels."
+                },
+                "C677T Heterozygous": {
+                    "phenotype": "Mildly Reduced Activity (65%)",
+                    "drugs_affected": [],
+                    "recommendation": "May benefit from methylated B-vitamins if homocysteine elevated."
+                },
+                "A1298C Homozygous": {
+                    "phenotype": "Mildly Reduced Activity",
+                    "drugs_affected": [],
+                    "recommendation": "Less significant than C677T. Monitor if combined with other variants."
+                },
+                "Compound Heterozygous (C677T/A1298C)": {
+                    "phenotype": "Moderately Reduced Activity",
+                    "drugs_affected": [
+                        "Methotrexate"
+                    ],
+                    "recommendation": "Similar to C677T homozygous. Consider methylated B-vitamins."
+                }
+            }
+        },
+        {
+            "gene": "APOE",
+            "variants": {
+                "e4/e4": {
+                    "phenotype": "High Risk Alzheimer's Disease",
+                    "drugs_affected": [],
+                    "recommendation": "Increased risk of late-onset Alzheimer's (10-15x). Consider aggressive cardiovascular risk management. Discuss cognitive screening."
+                },
+                "e3/e4": {
+                    "phenotype": "Moderate Risk Alzheimer's Disease",
+                    "drugs_affected": [],
+                    "recommendation": "Increased risk (3x). Standard preventive care with attention to cardiovascular health."
+                },
+                "e2/e3": {
+                    "phenotype": "Lower Risk Alzheimer's Disease",
+                    "drugs_affected": [],
+                    "recommendation": "Below-average risk. May have altered lipid metabolism."
+                },
+                "e3/e3": {
+                    "phenotype": "Average Risk",
+                    "drugs_affected": [],
+                    "recommendation": "Population-average risk for Alzheimer's."
+                }
+            }
+        },
+        {
+            "gene": "HLA-B",
+            "variants": {
+                "B*57:01": {
+                    "phenotype": "Abacavir Hypersensitivity Risk",
+                    "drugs_affected": [
+                        "Abacavir"
+                    ],
+                    "recommendation": "DO NOT prescribe Abacavir. High risk of severe hypersensitivity reaction."
+                },
+                "B*15:02": {
+                    "phenotype": "Carbamazepine SJS/TEN Risk",
+                    "drugs_affected": [
+                        "Carbamazepine",
+                        "Phenytoin"
+                    ],
+                    "recommendation": "AVOID carbamazepine/phenytoin in patients of Asian ancestry. High risk of Stevens-Johnson Syndrome."
+                },
+                "B27": {
+                    "phenotype": "Spondyloarthropathy Association",
+                    "drugs_affected": [],
+                    "recommendation": "Associated with Ankylosing Spondylitis, Reactive Arthritis. Not a drug interaction but important for diagnosis."
+                }
+            }
+        },
+        {
+            "gene": "SLCO1B1",
+            "variants": {
+                "*5/*5": {
+                    "phenotype": "Reduced Statin Transporter",
+                    "drugs_affected": [
+                        "Simvastatin",
+                        "Atorvastatin"
+                    ],
+                    "recommendation": "High risk of statin-induced myopathy. Use lower doses or alternative statins (pravastatin, rosuvastatin)."
+                },
+                "*1/*5": {
+                    "phenotype": "Intermediate Transporter",
+                    "drugs_affected": [
+                        "Simvastatin"
+                    ],
+                    "recommendation": "Moderate risk. Avoid high-dose simvastatin (>20mg)."
+                }
+            }
+        },
+        {
+            "gene": "VKORC1",
+            "variants": {
+                "-1639 G>A (AA)": {
+                    "phenotype": "Warfarin Sensitive",
+                    "drugs_affected": [
+                        "Warfarin"
+                    ],
+                    "recommendation": "Requires lower warfarin doses. Start at reduced dose and titrate carefully."
+                },
+                "-1639 G>A (GG)": {
+                    "phenotype": "Warfarin Resistant",
+                    "drugs_affected": [
+                        "Warfarin"
+                    ],
+                    "recommendation": "May require higher warfarin doses to achieve therapeutic INR."
+                }
+            }
+        },
+        {
+            "gene": "HBB",
+            "variants": {
+                "HbS/HbS": {
+                    "phenotype": "Sickle Cell Disease",
+                    "drugs_affected": [],
+                    "recommendation": "Sickle Cell Anemia. Hydroxyurea often indicated. Avoid dehydration, hypoxia. Vaccinate against encapsulated organisms."
+                },
+                "HbS/HbC": {
+                    "phenotype": "Sickle Cell Disease (SC)",
+                    "drugs_affected": [],
+                    "recommendation": "Milder sickle cell variant. Still at risk for crises."
+                },
+                "HbS/HbA": {
+                    "phenotype": "Sickle Cell Trait",
+                    "drugs_affected": [],
+                    "recommendation": "Carrier status. Generally asymptomatic but may have issues with extreme exertion or hypoxia."
+                }
+            }
+        },
+        {
+            "gene": "TPMT",
+            "variants": {
+                "*3A/*3A": {
+                    "phenotype": "TPMT Deficient",
+                    "drugs_affected": [
+                        "Azathioprine",
+                        "6-Mercaptopurine"
+                    ],
+                    "recommendation": "DRAMATICALLY reduce dose of thiopurines (1/10th standard dose) or use alternative. High risk of myelosuppression."
+                },
+                "*1/*3A": {
+                    "phenotype": "Intermediate TPMT",
+                    "drugs_affected": [
+                        "Azathioprine",
+                        "6-Mercaptopurine"
+                    ],
+                    "recommendation": "Start at 50% of standard dose. Monitor closely for myelosuppression."
+                }
+            }
+        },
+        {
+            "gene": "DPYD",
+            "variants": {
+                "*2A/*2A": {
+                    "phenotype": "DPD Deficient",
+                    "drugs_affected": [
+                        "5-Fluorouracil",
+                        "Capecitabine"
+                    ],
+                    "recommendation": "AVOID fluoropyrimidines. Extreme risk of severe/fatal toxicity."
+                },
+                "*1/*2A": {
+                    "phenotype": "Intermediate DPD",
+                    "drugs_affected": [
+                        "5-Fluorouracil",
+                        "Capecitabine"
+                    ],
+                    "recommendation": "Reduce fluoropyrimidine dose by 50%. Monitor closely."
+                }
+            }
+        }
+    ]
+}

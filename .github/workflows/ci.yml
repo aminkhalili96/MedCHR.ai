@@ -1,0 +1,137 @@
+name: MedCHR CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: medchr
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/medchr
+      SUPABASE_URL: http://localhost
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.CI_SUPABASE_SERVICE_ROLE_KEY }}
+      APP_SECRET_KEY: ${{ secrets.CI_APP_SECRET_KEY }}
+      APP_ENV: prod
+      HIPAA_MODE: true
+      PHI_PROCESSORS: supabase
+      MFA_SECRET_KEY: ${{ secrets.CI_MFA_SECRET_KEY }}
+      API_KEYS: 00000000-0000-0000-0000-000000000000:${{ secrets.CI_TENANT_API_KEY }}
+      RETENTION_IMMUTABLE_DIR: data/retention_immutable
+      TRUST_PROXY_HEADERS: false
+      MIGRATION_APPLIED_BY: github-actions
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+      - name: Verify migrations apply cleanly
+        run: |
+          python -m backend.scripts.init_db
+      - name: Run cloud-agnostic control validation gate
+        run: |
+          python -m backend.scripts.validate_controls \
+            --require-db \
+            --fail-on-failures \
+            --output-json data/control_reports/control_validation.json \
+            --output-markdown data/control_reports/control_validation.md
+      - name: Generate evidence pack (release gate)
+        run: |
+          python -m backend.scripts.generate_evidence_pack --output-dir data/evidence_packs
+      - name: Verify audit hash chain integrity
+        run: |
+          python -m backend.scripts.verify_audit_chain
+      - name: Run critical security regression suite
+        run: |
+          pytest -q \
+            backend/tests/test_security.py \
+            backend/tests/test_authz.py \
+            backend/tests/test_llm_gateway.py \
+            backend/tests/test_mfa_lockout.py \
+            backend/tests/test_uploads.py \
+            backend/tests/test_ip_whitelist.py \
+            backend/tests/test_audit_coverage.py
+      - name: Run tests
+        run: |
+          pytest -q
+      - name: Security scan (Bandit)
+        run: |
+          pip install bandit
+          bandit -r backend/app -q
+      - name: Dependency vulnerability gate
+        run: |
+          pip install pip-audit
+          IGNORE_ARGS=""
+          if [ -f .github/pip-audit-waivers.txt ]; then
+            IGNORE_ARGS="$(awk 'NF && $1 !~ /^#/ {printf \" --ignore-vuln %s\", $1}' .github/pip-audit-waivers.txt)"
+          fi
+          # Fails build for any unwaived vulnerability findings.
+          eval "pip-audit -r backend/requirements.txt ${IGNORE_ARGS}"
+      - name: Secret scan gate
+        run: |
+          python -m backend.scripts.scan_secrets
+      - name: LLM gateway usage gate
+        run: |
+          python -m backend.scripts.validate_llm_gateway_usage
+      - name: Runtime policy gate
+        run: |
+          python -m backend.scripts.validate_runtime_policy
+      - name: Generate SBOM
+        run: |
+          pip install cyclonedx-bom
+          cyclonedx-py requirements backend/requirements.txt --of JSON -o sbom.cdx.json
+      - name: Build container image
+        run: |
+          docker build -t medchr-backend:ci .
+      - name: Container vulnerability gate
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: medchr-backend:ci
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+      - name: Package build artifact
+        run: |
+          tar -czf medchr-backend.tar.gz backend
+      - name: Upload SBOM and artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: medchr-build
+          path: |
+            sbom.cdx.json
+            medchr-backend.tar.gz
+            data/control_reports/control_validation.json
+            data/control_reports/control_validation.md
+            data/evidence_packs
+      - name: Attest build artifact
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: medchr-backend.tar.gz

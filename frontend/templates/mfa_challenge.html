@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width: 520px; margin: 0 auto;">
+  <div class="card-header">
+    <h3 class="card-title">{% if step_up %}Step-Up Verification{% else %}Two-Factor Authentication{% endif %}</h3>
+  </div>
+
+  <p>Enter the 6-digit code from your authenticator app.</p>
+  {% if email %}
+  <p class="muted" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">
+    {{ email }}
+  </p>
+  {% endif %}
+
+  {% if error %}
+  <div style="background: var(--error-light); color: var(--error); padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 16px;">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  <form action="{{ action or '/ui/mfa-verify' }}" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% if next %}
+    <input type="hidden" name="next" value="{{ next }}">
+    {% endif %}
+
+    <div class="mt-md">
+      <label for="code">Authentication Code</label>
+      <input id="code" name="code" type="text" placeholder="000000" maxlength="6" pattern="[0-9]*" inputmode="numeric"
+        required autofocus style="text-align: center; font-size: 20px; letter-spacing: 0.2em;">
+    </div>
+
+    <div class="mt-md" style="display: flex; gap: 12px; align-items: center;">
+      <button type="submit">Verify</button>
+      {% if step_up %}
+      <a class="btn btn-secondary" href="{{ next or '/ui' }}">Cancel</a>
+      {% else %}
+      <a class="btn btn-secondary" href="/ui/login">Back to Login</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,3 @@
+# Add one vulnerability ID per line to waive temporarily.
+# Example:
+# GHSA-xxxx-yyyy-zzzz

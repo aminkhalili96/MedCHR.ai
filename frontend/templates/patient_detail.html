@@ -1,0 +1,838 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  /* Progress Bar Styles */
+  .progress-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(250, 249, 246, 0.95);
+    z-index: 9999;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .progress-overlay.active {
+    display: flex;
+  }
+
+  .progress-container {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 40px 60px;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+    max-width: 400px;
+    width: 90%;
+  }
+
+  .progress-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .progress-subtitle {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+  }
+
+  .progress-bar-wrapper {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-primary), #E8956E);
+    border-radius: var(--radius-full);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  .progress-percentage {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--accent-primary);
+    margin-bottom: 8px;
+  }
+
+  .progress-step {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Progress Overlay for Upload/Processing -->
+<div class="progress-overlay" id="uploadProgress">
+  <div class="progress-container">
+    <div class="progress-title">Processing Documents</div>
+    <div class="progress-subtitle">Please wait while we extract and analyze your files</div>
+    <div class="progress-percentage" id="uploadPercentage">0%</div>
+    <div class="progress-bar-wrapper">
+      <div class="progress-bar-fill" id="uploadProgressBar"></div>
+    </div>
+    <div class="progress-step" id="uploadStep">Uploading files...</div>
+  </div>
+</div>
+
+<!-- Progress Overlay for CHR Generation -->
+<div class="progress-overlay" id="chrProgress">
+  <div class="progress-container">
+    <div class="progress-title">Generating Health Report</div>
+    <div class="progress-subtitle">AI is analyzing your patient data</div>
+    <div class="progress-percentage" id="chrPercentage">0%</div>
+    <div class="progress-bar-wrapper">
+      <div class="progress-bar-fill" id="chrProgressBar"></div>
+    </div>
+    <div class="progress-step" id="chrStep">Initializing...</div>
+  </div>
+</div>
+
+<!-- Breadcrumb -->
+<div style="margin-bottom: 16px;">
+  <a href="/ui" style="color: var(--text-muted); font-size: 13px;">← Back to Patients</a>
+</div>
+
+<!-- Patient Header Card -->
+<div class="card"
+  style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+  <div style="display: flex; align-items: center; gap: 16px;">
+    <div style="
+          width: 56px;
+          height: 56px;
+          background: linear-gradient(135deg, var(--accent-primary), #E8956E);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-weight: 700;
+          font-size: 22px;
+        ">
+      {{ patient.full_name[0] | upper }}
+    </div>
+    <div>
+      <h1 style="margin: 0; font-size: 22px;">{{ patient.full_name }}</h1>
+      <p class="muted" style="margin: 4px 0 0 0;">
+        DOB: {{ patient.dob or "Not specified" }}
+        {% if patient.notes %} · {{ patient.notes[:60] }}{% if patient.notes|length > 60 %}...{% endif %}{% endif %}
+      </p>
+    </div>
+  </div>
+  <a href="/ui/patients/{{ patient.id }}/report" class="btn-primary" style="text-decoration: none; padding: 12px 24px;">
+    View CHR Report →
+  </a>
+</div>
+
+{% if pending_jobs %}
+<div class="card" style="border-left: 4px solid var(--warning); background: var(--warning-light); padding: 16px 20px;">
+  <strong>Background processing in progress</strong>
+  <p class="muted" style="margin: 6px 0 0 0;">
+    {{ pending_jobs | length }} job(s) running. Refresh in a moment to see updates.
+  </p>
+</div>
+{% endif %}
+
+<!-- Progress Stepper -->
+<div class="card" style="padding: 24px 32px;">
+  <div style="display: flex; align-items: center; justify-content: space-between; position: relative;">
+    <!-- Step 1: Upload -->
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 1;">
+      <div style="
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: {% if documents %}var(--success){% else %}var(--border){% endif %};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+          ">
+        {% if documents %}✓{% else %}1{% endif %}
+      </div>
+      <span
+        style="font-size: 13px; font-weight: 500; color: {% if documents %}var(--success){% else %}var(--text-secondary){% endif %};">
+        Upload
+      </span>
+    </div>
+
+    <!-- Connector -->
+    <div
+      style="flex: 1; height: 2px; background: {% if documents %}var(--success){% else %}var(--border){% endif %}; margin: 0 -20px 24px -20px;">
+    </div>
+
+    <!-- Step 2: Process -->
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 1;">
+      <div style="
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: {% if has_extractions %}var(--success){% elif documents %}var(--accent-primary){% else %}var(--border){% endif %};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+          ">
+        {% if has_extractions %}✓{% else %}2{% endif %}
+      </div>
+      <span
+        style="font-size: 13px; font-weight: 500; color: {% if has_extractions %}var(--success){% elif documents %}var(--accent-primary){% else %}var(--text-muted){% endif %};">
+        Process
+      </span>
+    </div>
+
+    <!-- Connector -->
+    <div
+      style="flex: 1; height: 2px; background: {% if has_extractions %}var(--success){% else %}var(--border){% endif %}; margin: 0 -20px 24px -20px;">
+    </div>
+
+    <!-- Step 3: Generate -->
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 1;">
+      <div style="
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: {% if draft %}var(--success){% elif has_extractions %}var(--accent-primary){% else %}var(--border){% endif %};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+          ">
+        {% if draft %}✓{% else %}3{% endif %}
+      </div>
+      <span
+        style="font-size: 13px; font-weight: 500; color: {% if draft %}var(--success){% elif has_extractions %}var(--accent-primary){% else %}var(--text-muted){% endif %};">
+        Generate
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Documents Section -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">📄 Upload Documents</h3>
+  </div>
+  <form id="uploadForm" method="post" action="/ui/patients/{{ patient.id }}/upload" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <input type="file" name="files" multiple required />
+    <p class="muted mt-sm">Supported: PDF, images (lab reports, clinical notes, imaging summaries)</p>
+    <button type="submit" class="mt-md">Upload & Process</button>
+  </form>
+</div>
+
+<!-- Lifestyle Assessment Section (N1.care Feature) -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">🏃 Lifestyle Assessment</h3>
+    <span class="badge badge-neutral">N1 Feature</span>
+  </div>
+  <form method="post" action="/ui/patients/{{ patient.id }}/lifestyle">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+      <div>
+        <label for="diet">Diet Type</label>
+        <select id="diet" name="diet">
+          <option value="" {% if not patient.lifestyle.diet %}selected{% endif %}>Select...</option>
+          <option value="standard" {% if patient.lifestyle.diet=='standard' %}selected{% endif %}>Standard Western
+          </option>
+          <option value="mediterranean" {% if patient.lifestyle.diet=='mediterranean' %}selected{% endif %}>
+            Mediterranean</option>
+          <option value="vegetarian" {% if patient.lifestyle.diet=='vegetarian' %}selected{% endif %}>Vegetarian
+          </option>
+          <option value="vegan" {% if patient.lifestyle.diet=='vegan' %}selected{% endif %}>Vegan</option>
+          <option value="keto" {% if patient.lifestyle.diet=='keto' %}selected{% endif %}>Keto/Low-Carb</option>
+          <option value="paleo" {% if patient.lifestyle.diet=='paleo' %}selected{% endif %}>Paleo</option>
+          <option value="other" {% if patient.lifestyle.diet=='other' %}selected{% endif %}>Other</option>
+        </select>
+      </div>
+      <div>
+        <label for="exercise">Exercise Frequency</label>
+        <select id="exercise" name="exercise">
+          <option value="" {% if not patient.lifestyle.exercise %}selected{% endif %}>Select...</option>
+          <option value="sedentary" {% if patient.lifestyle.exercise=='sedentary' %}selected{% endif %}>Sedentary (No
+            exercise)</option>
+          <option value="light" {% if patient.lifestyle.exercise=='light' %}selected{% endif %}>Light (1-2x/week)
+          </option>
+          <option value="moderate" {% if patient.lifestyle.exercise=='moderate' %}selected{% endif %}>Moderate
+            (3-4x/week)</option>
+          <option value="active" {% if patient.lifestyle.exercise=='active' %}selected{% endif %}>Active (5+x/week)
+          </option>
+          <option value="athlete" {% if patient.lifestyle.exercise=='athlete' %}selected{% endif %}>Athletic Training
+          </option>
+        </select>
+      </div>
+      <div>
+        <label for="stress">Stress Level (1-10)</label>
+        <select id="stress" name="stress">
+          <option value="" {% if not patient.lifestyle.stress_level %}selected{% endif %}>Select...</option>
+          {% for i in range(1, 11) %}
+          <option value="{{ i }}" {% if patient.lifestyle.stress_level==i|string %}selected{% endif %}>{{ i }}{% if i <=
+              3 %} (Low){% elif i <=6 %} (Moderate){% elif i <=8 %} (High){% else %} (Severe){% endif %}</option>
+              {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="sleep">Sleep Quality</label>
+        <select id="sleep" name="sleep">
+          <option value="" {% if not patient.lifestyle.sleep_quality %}selected{% endif %}>Select...</option>
+          <option value="excellent" {% if patient.lifestyle.sleep_quality=='excellent' %}selected{% endif %}>Excellent
+            (7-9 hrs, restful)</option>
+          <option value="good" {% if patient.lifestyle.sleep_quality=='good' %}selected{% endif %}>Good (6-7 hrs)
+          </option>
+          <option value="fair" {% if patient.lifestyle.sleep_quality=='fair' %}selected{% endif %}>Fair (5-6 hrs, some
+            issues)</option>
+          <option value="poor" {% if patient.lifestyle.sleep_quality=='poor' %}selected{% endif %}>Poor (<5 hrs,
+              restless)</option>
+        </select>
+      </div>
+      <div>
+        <label for="smoking">Smoking Status</label>
+        <select id="smoking" name="smoking">
+          <option value="" {% if not patient.lifestyle.smoking %}selected{% endif %}>Select...</option>
+          <option value="never" {% if patient.lifestyle.smoking=='never' %}selected{% endif %}>Never Smoked</option>
+          <option value="former" {% if patient.lifestyle.smoking=='former' %}selected{% endif %}>Former Smoker</option>
+          <option value="current_light" {% if patient.lifestyle.smoking=='current_light' %}selected{% endif %}>Current (
+            <10 /day)</option>
+          <option value="current_heavy" {% if patient.lifestyle.smoking=='current_heavy' %}selected{% endif %}>Current
+            (10+/day)</option>
+        </select>
+      </div>
+      <div>
+        <label for="alcohol">Alcohol Use</label>
+        <select id="alcohol" name="alcohol">
+          <option value="" {% if not patient.lifestyle.alcohol %}selected{% endif %}>Select...</option>
+          <option value="none" {% if patient.lifestyle.alcohol=='none' %}selected{% endif %}>None</option>
+          <option value="occasional" {% if patient.lifestyle.alcohol=='occasional' %}selected{% endif %}>Occasional
+            (≤2/week)</option>
+          <option value="moderate" {% if patient.lifestyle.alcohol=='moderate' %}selected{% endif %}>Moderate (3-7/week)
+          </option>
+          <option value="heavy" {% if patient.lifestyle.alcohol=='heavy' %}selected{% endif %}>Heavy (>7/week)</option>
+        </select>
+      </div>
+    </div>
+    <div class="mt-md">
+      <label for="environmental">Environmental Exposures</label>
+      <input type="text" id="environmental" name="environmental"
+        placeholder="e.g., mold, chemicals, pollution, occupational hazards..."
+        value="{{ patient.lifestyle.environmental_exposures or '' }}" />
+    </div>
+    <button type="submit" class="mt-md btn-secondary">Save Lifestyle Data</button>
+  </form>
+</div>
+
+<!-- Documents List -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">📋 Documents</h3>
+    <span class="badge badge-neutral">{{ documents | length }} files</span>
+  </div>
+  {% if documents %}
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+    {% for doc in documents %}
+    <div style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              padding: 16px;
+              background: var(--bg-tertiary);
+              border-radius: var(--radius-md);
+              border: 1px solid var(--border-light);
+            ">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="
+                  width: 40px;
+                  height: 40px;
+                  background: var(--bg-secondary);
+                  border: 1px solid var(--border);
+                  border-radius: var(--radius-sm);
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 18px;
+                ">
+          {% if 'pdf' in doc.content_type %}📄{% elif 'image' in doc.content_type %}🖼️{% else %}📎{% endif %}
+        </div>
+        <div>
+          <div style="font-weight: 500; font-size: 14px; color: var(--text-primary);">
+            {{ doc.filename }}
+          </div>
+          <div style="font-size: 12px; color: var(--text-muted);">
+            {{ doc.content_type }}
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="badge badge-success">✓ Processed</span>
+        {% if dev_mode %}
+        <form method="post" action="/ui/documents/{{ doc.id }}/extract" style="display:inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <input type="hidden" name="patient_id" value="{{ patient.id }}" />
+          <button type="submit" class="btn-secondary btn-sm">Re-Extract</button>
+        </form>
+        <form method="post" action="/ui/documents/{{ doc.id }}/embed" style="display:inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <input type="hidden" name="patient_id" value="{{ patient.id }}" />
+          <button type="submit" class="btn-secondary btn-sm">Re-Embed</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">📁</div>
+    <p style="font-size: 14px; color: var(--text-secondary);">No documents uploaded yet</p>
+    <p style="font-size: 13px; color: var(--text-muted);">Upload lab reports, clinical notes, or imaging summaries above
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Generate CHR Section -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">🧠 Generate Health Report</h3>
+  </div>
+  <form id="chrForm" method="post" action="/ui/patients/{{ patient.id }}/draft">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    <label for="notes">Clinician Notes (Optional)</label>
+    <textarea id="notes" name="notes" rows="3"
+      placeholder="Add specific focus areas, concerns, or context for the AI summary..."></textarea>
+    <div class="mt-md" style="display: flex; gap: 12px; align-items: center;">
+      <button type="submit" {% if not documents %}disabled{% endif %}>
+        Generate CHR Draft
+      </button>
+      {% if not documents %}
+      <span class="muted">Upload documents first to enable report generation</span>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if draft %}
+  <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border-light);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <span class="badge badge-success">✓ Draft Generated</span>
+      <span class="muted">{{ draft.created_at }}</span>
+    </div>
+    <a href="/ui/patients/{{ patient.id }}/report" style="color: var(--accent-primary); font-weight: 500;">
+      View Full Report →
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ========== GAP CLOSURE FEATURES ========== -->
+
+<!-- Lab Trends (Gap 1: Longitudinal Intelligence) -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">📈 Lab Trends</h3>
+    <span class="badge badge-info">Gap 1: Longitudinal</span>
+  </div>
+  <div id="trendsContainer">
+    <p class="muted">Loading trends...</p>
+  </div>
+  <div style="margin-top: 16px;">
+    <canvas id="trendsChart" width="400" height="200" style="display: none;"></canvas>
+  </div>
+  <div id="trendsList" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px;"></div>
+</div>
+
+<!-- Patient Timeline (Gap 7) -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">🕐 Patient Timeline</h3>
+    <span class="badge badge-info">Gap 7: Timeline</span>
+  </div>
+  <div id="timelineContainer" style="max-height: 400px; overflow-y: auto;">
+    <p class="muted">Loading timeline...</p>
+  </div>
+</div>
+
+<!-- Clinical Insights (Gap 2: Knowledge Base) -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">💡 Clinical Insights</h3>
+    <span class="badge badge-info">Gap 2: Rules Engine</span>
+  </div>
+  <div id="insightsContainer">
+    <p class="muted">Loading clinical insights...</p>
+  </div>
+</div>
+
+<!-- Genetics Interpretation (Gap 4) -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">🧬 Pharmacogenomics</h3>
+    <span class="badge badge-info">Gap 4: Genetics</span>
+  </div>
+  <div id="geneticsContainer">
+    <p class="muted">Loading genetics interpretation...</p>
+  </div>
+</div>
+
+<!-- Suggested Diagnoses (Gap 5) -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">🩺 Suggested Assessments</h3>
+    <span class="badge badge-warning">AI-Generated</span>
+    <span class="badge badge-info">Gap 5: Suggestions</span>
+  </div>
+  <div id="suggestionsContainer">
+    <button id="loadSuggestionsBtn" class="btn-secondary">Generate Suggestions</button>
+    <p class="muted mt-sm">Click to generate AI-assisted diagnosis suggestions based on patient data.</p>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce }}" src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script nonce="{{ csp_nonce }}">
+  const patientId = "{{ patient.id }}";
+
+  // ===== GAP 1: Load Trends =====
+  async function loadTrends() {
+    try {
+      const resp = await fetch(`/api/gap/patients/${patientId}/trends`);
+      if (!resp.ok) throw new Error('Failed to load trends');
+      const trends = await resp.json();
+
+      const container = document.getElementById('trendsContainer');
+      const listEl = document.getElementById('trendsList');
+      const chartCanvas = document.getElementById('trendsChart');
+
+      if (trends.length === 0) {
+        container.innerHTML = '<p class="muted">No lab trends available. Upload lab documents to see longitudinal data.</p>';
+        return;
+      }
+
+      container.innerHTML = '<p class="muted">Select a biomarker to view trend:</p>';
+      listEl.innerHTML = '';
+
+      // Create buttons for each biomarker
+      trends.forEach((trend, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-secondary btn-sm';
+        btn.textContent = `${trend.canonical_name} (${trend.data_points.length})`;
+        btn.onclick = () => showTrendChart(trend, chartCanvas);
+        listEl.appendChild(btn);
+      });
+
+      // Show first trend by default
+      if (trends.length > 0) {
+        showTrendChart(trends[0], chartCanvas);
+      }
+    } catch (e) {
+      document.getElementById('trendsContainer').innerHTML = '<p class="muted">Could not load trends.</p>';
+    }
+  }
+
+  function showTrendChart(trend, canvas) {
+    canvas.style.display = 'block';
+    const ctx = canvas.getContext('2d');
+
+    // Destroy existing chart if any
+    if (window.trendChart) window.trendChart.destroy();
+
+    window.trendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: trend.data_points.map(p => p.date),
+        datasets: [{
+          label: trend.canonical_name + (trend.unit ? ` (${trend.unit})` : ''),
+          data: trend.data_points.map(p => p.value),
+          borderColor: '#D4744A',
+          backgroundColor: 'rgba(212, 116, 74, 0.1)',
+          fill: true,
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: true } },
+        scales: { y: { beginAtZero: false } }
+      }
+    });
+  }
+
+  // ===== GAP 7: Load Timeline =====
+  async function loadTimeline() {
+    try {
+      const resp = await fetch(`/api/gap/patients/${patientId}/timeline`);
+      if (!resp.ok) throw new Error('Failed to load timeline');
+      const events = await resp.json();
+
+      const container = document.getElementById('timelineContainer');
+
+      if (events.length === 0) {
+        container.innerHTML = '<p class="muted">No timeline events available.</p>';
+        return;
+      }
+
+      let html = '<div style="border-left: 3px solid var(--border); padding-left: 20px; margin-left: 10px;">';
+      events.forEach(ev => {
+        html += `
+          <div style="position: relative; margin-bottom: 20px;">
+            <div style="position: absolute; left: -28px; width: 16px; height: 16px; border-radius: 50%; background: ${ev.color || '#6b7280'}; border: 2px solid white;"></div>
+            <div style="font-weight: 600; color: var(--text-primary);">${ev.icon || ''} ${ev.title}</div>
+            <div style="font-size: 12px; color: var(--text-muted);">${ev.display_date || ev.event_date}</div>
+            <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">${ev.description || ''}</div>
+          </div>
+        `;
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    } catch (e) {
+      document.getElementById('timelineContainer').innerHTML = '<p class="muted">Could not load timeline.</p>';
+    }
+  }
+
+  // ===== GAP 2: Load Clinical Insights =====
+  async function loadInsights() {
+    try {
+      const resp = await fetch(`/api/gap/patients/${patientId}/clinical-insights`);
+      if (!resp.ok) throw new Error('Failed to load insights');
+      const insights = await resp.json();
+
+      const container = document.getElementById('insightsContainer');
+
+      if (insights.length === 0) {
+        container.innerHTML = '<p class="muted">No clinical patterns detected based on current rules.</p>';
+        return;
+      }
+
+      let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+      insights.forEach(ins => {
+        html += `
+          <div style="padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md); border-left: 4px solid var(--accent-primary);">
+            <div style="font-weight: 600; color: var(--accent-primary); margin-bottom: 8px;">${ins.rule_id.replace(/_/g, ' ').toUpperCase()}</div>
+            <div style="font-size: 14px; color: var(--text-primary);">${ins.recommendation}</div>
+          </div>
+        `;
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    } catch (e) {
+      document.getElementById('insightsContainer').innerHTML = '<p class="muted">Could not load clinical insights.</p>';
+    }
+  }
+
+  // ===== GAP 4: Load Genetics Interpretation =====
+  async function loadGenetics() {
+    try {
+      const resp = await fetch(`/api/gap/patients/${patientId}/genetics`);
+      if (!resp.ok) throw new Error('Failed to load genetics');
+      const genetics = await resp.json();
+
+      const container = document.getElementById('geneticsContainer');
+
+      if (genetics.length === 0) {
+        container.innerHTML = '<p class="muted">No genetic data available for interpretation.</p>';
+        return;
+      }
+
+      let html = '<div style="display: flex; flex-direction: column; gap: 16px;">';
+      genetics.forEach(g => {
+        const severityColor = g.drugs_affected.length > 0 ? 'var(--error)' : 'var(--success)';
+        html += `
+          <div style="padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 700; font-size: 16px;">${g.gene} - ${g.variant}</span>
+              <span class="badge" style="background: ${severityColor}; color: white;">${g.phenotype}</span>
+            </div>
+            ${g.drugs_affected.length > 0 ? `
+              <div style="margin-top: 8px; font-size: 13px; color: var(--error);">
+                <strong>Drugs Affected:</strong> ${g.drugs_affected.join(', ')}
+              </div>
+            ` : ''}
+            <div style="margin-top: 8px; font-size: 14px; color: var(--text-secondary);">${g.recommendation}</div>
+          </div>
+        `;
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    } catch (e) {
+      document.getElementById('geneticsContainer').innerHTML = '<p class="muted">Could not load genetics interpretation.</p>';
+    }
+  }
+
+  // ===== GAP 5: Load Diagnosis Suggestions (On-demand) =====
+  document.getElementById('loadSuggestionsBtn').addEventListener('click', async function () {
+    const container = document.getElementById('suggestionsContainer');
+    container.innerHTML = '<p class="muted">Generating suggestions... (this may take a moment)</p>';
+
+    try {
+      const resp = await fetch(`/api/gap/patients/${patientId}/suggested-diagnoses`);
+      if (!resp.ok) throw new Error('Failed to load suggestions');
+      const suggestions = await resp.json();
+
+      if (suggestions.length === 0) {
+        container.innerHTML = '<p class="muted">No additional diagnoses suggested at this time.</p>';
+        return;
+      }
+
+      let html = '<div style="display: flex; flex-direction: column; gap: 16px;">';
+      suggestions.forEach((s, idx) => {
+        const confColor = s.confidence === 'HIGH' ? 'var(--error)' : (s.confidence === 'MEDIUM' ? 'var(--warning)' : 'var(--success)');
+        html += `
+          <div style="padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius-md); border-left: 4px solid ${confColor};">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-weight: 700; font-size: 15px;">${idx + 1}. ${s.diagnosis}</span>
+              <span class="badge" style="background: ${confColor}; color: white;">${s.confidence}</span>
+            </div>
+            <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">ICD-10: ${s.icd10 || 'Not specified'}</div>
+            <div style="font-size: 14px; color: var(--text-secondary);">${s.rationale}</div>
+          </div>
+        `;
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    } catch (e) {
+      container.innerHTML = '<p class="muted">Could not generate suggestions. Ensure OpenAI API is configured.</p>';
+    }
+  });
+
+  // Load all gap features on page load
+  document.addEventListener('DOMContentLoaded', function () {
+    loadTrends();
+    loadTimeline();
+    loadInsights();
+    loadGenetics();
+  });
+</script>
+
+<!-- RAG Debug (Dev Mode) -->
+{% if dev_mode %}
+<div class="card" style="border: 1px dashed var(--warning); background: var(--warning-light);">
+  <div class="card-header">
+    <h3 class="card-title">🔧 Developer Tools</h3>
+    <span class="badge" style="background: var(--warning); color: white;">Dev Mode</span>
+  </div>
+  <div style="display: flex; gap: 12px;">
+    <a href="/ui/patients/{{ patient.id }}/rag" class="btn-secondary" style="text-decoration: none;">
+      View RAG Top-K Chunks
+    </a>
+    <a href="/ui/embeddings" class="btn-secondary" style="text-decoration: none;">
+      View All Embeddings
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<!-- Audit Log (Collapsible) -->
+<div class="card">
+  <div class="collapsible-header">
+    <h3 class="card-title" style="margin: 0;">📝 Activity Log</h3>
+    <span class="chevron">▼</span>
+  </div>
+  <div class="collapsible-content">
+    {% if logs %}
+    <table style="margin-top: 16px;">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Actor</th>
+          <th>Action</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td>{{ log.created_at }}</td>
+          <td>{{ log.actor }}</td>
+          <td><span class="badge badge-neutral">{{ log.action }}</span></td>
+          <td class="muted">{{ log.details }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted" style="margin-top: 16px;">No activity logged yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+  // Progress bar animation for Upload & Process
+  document.getElementById('uploadForm').addEventListener('submit', function (e) {
+    const overlay = document.getElementById('uploadProgress');
+    const percentageEl = document.getElementById('uploadPercentage');
+    const progressBar = document.getElementById('uploadProgressBar');
+    const stepEl = document.getElementById('uploadStep');
+
+    overlay.classList.add('active');
+
+    const steps = [
+      { percent: 15, text: 'Uploading files...' },
+      { percent: 35, text: 'Extracting text...' },
+      { percent: 55, text: 'Running OCR analysis...' },
+      { percent: 75, text: 'Generating embeddings...' },
+      { percent: 90, text: 'Indexing for search...' },
+      { percent: 100, text: 'Complete!' }
+    ];
+
+    let stepIndex = 0;
+    const interval = setInterval(() => {
+      if (stepIndex < steps.length) {
+        const step = steps[stepIndex];
+        percentageEl.textContent = step.percent + '%';
+        progressBar.style.width = step.percent + '%';
+        stepEl.textContent = step.text;
+        stepIndex++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 800);
+  });
+
+  // Progress bar animation for CHR Generation
+  document.getElementById('chrForm').addEventListener('submit', function (e) {
+    const overlay = document.getElementById('chrProgress');
+    const percentageEl = document.getElementById('chrPercentage');
+    const progressBar = document.getElementById('chrProgressBar');
+    const stepEl = document.getElementById('chrStep');
+
+    overlay.classList.add('active');
+
+    const steps = [
+      { percent: 10, text: 'Loading patient data...' },
+      { percent: 25, text: 'Retrieving relevant context...' },
+      { percent: 45, text: 'Analyzing lab results...' },
+      { percent: 60, text: 'Generating clinical summary...' },
+      { percent: 80, text: 'Adding citations...' },
+      { percent: 95, text: 'Finalizing report...' },
+      { percent: 100, text: 'Complete!' }
+    ];
+
+    let stepIndex = 0;
+    const interval = setInterval(() => {
+      if (stepIndex < steps.length) {
+        const step = steps[stepIndex];
+        percentageEl.textContent = step.percent + '%';
+        progressBar.style.width = step.percent + '%';
+        stepEl.textContent = step.text;
+        stepIndex++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 700);
+  });
+</script>
+{% endblock %}

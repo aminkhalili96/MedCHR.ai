@@ -1,0 +1,131 @@
+{
+    "version": "1.0",
+    "description": "Clinical rules for Functional Medicine pattern recognition",
+    "rules": [
+        {
+            "id": "MTHFR_HOMOCYSTEINE",
+            "condition": {
+                "gene": "MTHFR",
+                "variant_contains": "C677T",
+                "and_lab": {
+                    "test": "Homocysteine",
+                    "operator": ">",
+                    "value": 10
+                }
+            },
+            "recommendation": "Consider methylated B-vitamin supplementation (L-Methylfolate 400-800mcg, Methylcobalamin 1000mcg) to support methylation and reduce homocysteine."
+        },
+        {
+            "id": "FERRITIN_LOW_FATIGUE",
+            "condition": {
+                "lab": "Ferritin",
+                "operator": "<",
+                "value": 50,
+                "and_symptom": "fatigue"
+            },
+            "recommendation": "Suboptimal ferritin (<50) is associated with fatigue even when not frankly anemic. Consider iron supplementation with Vitamin C for absorption."
+        },
+        {
+            "id": "VITAMIN_D_DEFICIENCY",
+            "condition": {
+                "lab": "Vitamin D",
+                "operator": "<",
+                "value": 30
+            },
+            "recommendation": "Vitamin D insufficiency detected. Consider supplementation with Vitamin D3 2000-5000 IU daily with fat-containing meal. Recheck in 8-12 weeks."
+        },
+        {
+            "id": "THYROID_SUBCLINICAL",
+            "condition": {
+                "lab": "TSH",
+                "operator": ">",
+                "value": 2.5,
+                "and_lab": {
+                    "test": "Free T4",
+                    "operator": "normal"
+                }
+            },
+            "recommendation": "TSH above optimal range (>2.5) with normal T4 may indicate subclinical hypothyroidism. Consider symptoms, antibodies (TPO), and trial of thyroid support."
+        },
+        {
+            "id": "INFLAMMATION_CRP_ESR",
+            "condition": {
+                "lab": "CRP",
+                "operator": ">",
+                "value": 3,
+                "or_lab": {
+                    "test": "ESR",
+                    "operator": ">",
+                    "value": 20
+                }
+            },
+            "recommendation": "Elevated inflammatory markers detected. Investigate source of inflammation. Consider anti-inflammatory diet, omega-3 supplementation, and addressing gut health."
+        },
+        {
+            "id": "PREDIABETES_HOMA",
+            "condition": {
+                "lab": "Fasting Glucose",
+                "operator": ">",
+                "value": 100,
+                "and_lab": {
+                    "test": "HbA1c",
+                    "operator": ">",
+                    "value": 5.6
+                }
+            },
+            "recommendation": "Pattern consistent with insulin resistance/prediabetes. Consider lifestyle intervention (low-glycemic diet, exercise), berberine, or metformin."
+        },
+        {
+            "id": "B12_DEFICIENCY",
+            "condition": {
+                "lab": "Vitamin B12",
+                "operator": "<",
+                "value": 400
+            },
+            "recommendation": "Suboptimal B12 (<400) may cause neurological symptoms. Consider methylcobalamin supplementation, especially if on metformin or PPI."
+        },
+        {
+            "id": "OMEGA3_INDEX_LOW",
+            "condition": {
+                "lab": "Omega-3 Index",
+                "operator": "<",
+                "value": 8
+            },
+            "recommendation": "Omega-3 index below optimal (<8%). Associated with increased cardiovascular risk and inflammation. Consider high-quality fish oil 2-4g EPA+DHA daily."
+        },
+        {
+            "id": "APOE4_CARDIOVASCULAR",
+            "condition": {
+                "gene": "APOE",
+                "variant_contains": "e4"
+            },
+            "recommendation": "APOE4 carrier status increases cardiovascular and Alzheimer's risk. Prioritize Mediterranean diet, exercise, sleep optimization, and aggressive lipid management."
+        },
+        {
+            "id": "CYP2D6_POOR_METABOLIZER",
+            "condition": {
+                "gene": "CYP2D6",
+                "variant_contains": "*4/*4"
+            },
+            "recommendation": "Poor CYP2D6 metabolizer. Avoid codeine/tramadol (no efficacy). Reduce doses of many antidepressants. Check interactions before prescribing."
+        },
+        {
+            "id": "LEAKY_GUT_ZONULIN",
+            "condition": {
+                "lab": "Zonulin",
+                "operator": ">",
+                "value": 50
+            },
+            "recommendation": "Elevated zonulin suggests increased intestinal permeability. Consider elimination diet, L-glutamine, and addressing underlying triggers (gluten, stress, dysbiosis)."
+        },
+        {
+            "id": "CORTISOL_LOW_MORNING",
+            "condition": {
+                "lab": "Cortisol AM",
+                "operator": "<",
+                "value": 10
+            },
+            "recommendation": "Low morning cortisol may indicate HPA axis dysfunction. Consider adaptogenic herbs (ashwagandha, rhodiola), stress management, and sleep optimization."
+        }
+    ]
+}

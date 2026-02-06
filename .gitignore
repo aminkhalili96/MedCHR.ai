@@ -12,5 +12,6 @@ venv/
 backend/.env
 backend/.venv
 backend/venv
-doc/
-data/
+doc/private/
+# data/  # Commented out - mock data is safe to access
+data/retention_exports/

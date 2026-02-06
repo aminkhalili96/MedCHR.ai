@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width: 720px; margin: 0 auto;">
+  <div class="card-header">
+    <h3 class="card-title">Set up Two-Factor Authentication</h3>
+  </div>
+
+  <p>Scan the QR code in your authenticator app, then enter the 6-digit code to confirm.</p>
+
+  {% if error %}
+  <div style="background: var(--error-light); color: var(--error); padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 16px;">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  <div class="grid" style="grid-template-columns: 1fr 1fr; align-items: start;">
+    <div>
+      <h4 style="margin-bottom: 8px;">Step 1 — Scan QR</h4>
+      <div style="background: var(--bg-tertiary); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 16px; text-align: center;">
+        {% if qr_code %}
+        <img src="data:image/png;base64,{{ qr_code }}" alt="MFA QR Code" style="max-width: 220px; width: 100%; height: auto;" />
+        {% else %}
+        <p class="text-error">QR code unavailable.</p>
+        {% endif %}
+      </div>
+      <p class="muted mt-sm" style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">
+        Secret: {{ secret }}
+      </p>
+    </div>
+
+    <div>
+      <h4 style="margin-bottom: 8px;">Step 2 — Verify Code</h4>
+      <form action="/ui/profile/mfa" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <label for="code">6-digit code</label>
+        <input id="code" name="code" type="text" placeholder="000000" maxlength="6" pattern="[0-9]*" inputmode="numeric"
+          required style="text-align: center; font-size: 20px; letter-spacing: 0.2em;">
+
+        <div class="mt-md" style="display: flex; gap: 12px; align-items: center;">
+          <button type="submit">Enable MFA</button>
+          <a class="btn btn-secondary" href="/ui">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
