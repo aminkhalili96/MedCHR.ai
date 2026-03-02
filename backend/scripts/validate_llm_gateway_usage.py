@@ -4,9 +4,12 @@ import argparse
 import ast
 from pathlib import Path
 
-DEFAULT_SCAN_ROOT = Path("backend/app")
+SCRIPT_DIR = Path(__file__).resolve().parent
+BACKEND_DIR = SCRIPT_DIR.parent
+REPO_ROOT = BACKEND_DIR.parent
+DEFAULT_SCAN_ROOT = REPO_ROOT / "backend" / "app"
 ALLOWED_OPENAI_FILES = {
-    Path("backend/app/llm_gateway.py").resolve(),
+    (REPO_ROOT / "backend" / "app" / "llm_gateway.py").resolve(),
 }
 
 

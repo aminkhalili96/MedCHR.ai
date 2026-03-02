@@ -7,6 +7,7 @@ Gap Reference: S04
 """
 
 import ipaddress
+from contextlib import contextmanager
 from typing import List, Optional
 
 
@@ -14,6 +15,16 @@ def _split_csv(value: str | None) -> list[str]:
     if not value:
         return []
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+@contextmanager
+def _connection_scope(conn=None):
+    if conn is not None:
+        yield conn
+        return
+    from .db import get_conn
+    with get_conn() as managed_conn:
+        yield managed_conn
 
 
 def _normalize_candidate_ip(value: str) -> str:
@@ -137,26 +148,34 @@ def is_ip_allowed(
 def get_tenant_whitelist(tenant_id: str, conn = None) -> List[str]:
     """
     Get IP whitelist for a tenant.
+    Uses the 'allowed_ips' column (PostgreSQL TEXT[]).
+    Falls back to legacy 'ip_whitelist' key for compatibility with old row payloads/tests.
     """
-    from .db import get_conn
-    import json
-    
-    if conn is None:
-        conn = get_conn()
-    
-    row = conn.execute(
-        "SELECT ip_whitelist FROM tenants WHERE id = %s",
-        (tenant_id,)
-    ).fetchone()
-    
-    if not row or not row["ip_whitelist"]:
+    with _connection_scope(conn) as db_conn:
+        row = db_conn.execute(
+            "SELECT allowed_ips FROM tenants WHERE id = %s",
+            (tenant_id,)
+        ).fetchone()
+
+    if not row:
         return []
-    
-    whitelist = row["ip_whitelist"]
+
+    whitelist = row.get("allowed_ips")
+    if whitelist is None and "ip_whitelist" in row:
+        whitelist = row.get("ip_whitelist")
+    if not whitelist:
+        return []
+
     if isinstance(whitelist, str):
-        whitelist = json.loads(whitelist)
-    
-    return whitelist
+        import json
+
+        try:
+            parsed = json.loads(whitelist)
+            whitelist = parsed
+        except json.JSONDecodeError:
+            whitelist = [item.strip() for item in whitelist.split(",") if item.strip()]
+
+    return [str(item).strip() for item in whitelist if str(item).strip()]
 
 
 def update_tenant_whitelist(
@@ -166,23 +185,20 @@ def update_tenant_whitelist(
 ):
     """
     Update IP whitelist for a tenant.
+    Uses the 'allowed_ips' column (PostgreSQL TEXT[]).
     """
-    from .db import get_conn
-    import json
-    
     # Validate all entries
     for entry in whitelist:
         if not parse_ip(entry) and not parse_cidr(entry):
             raise ValueError(f"Invalid IP or CIDR: {entry}")
     
-    if conn is None:
-        conn = get_conn()
-    
-    conn.execute(
-        "UPDATE tenants SET ip_whitelist = %s WHERE id = %s",
-        (json.dumps(whitelist), tenant_id)
-    )
-    conn.commit()
+    with _connection_scope(conn) as db_conn:
+        db_conn.execute(
+            "UPDATE tenants SET allowed_ips = %s WHERE id = %s",
+            (whitelist, tenant_id)
+        )
+        if conn is None:
+            db_conn.commit()
 
 
 def check_tenant_ip_access(

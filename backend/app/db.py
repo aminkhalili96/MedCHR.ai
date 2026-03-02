@@ -54,10 +54,10 @@ def get_conn():
             configure=_configure_connection,
         )
     with _pool.connection() as conn:
-        tenant_id = _tenant_id_var.get()
-        actor_id = _actor_id_var.get()
-        conn.execute("SET app.tenant_id = %s", (tenant_id or "",))
-        conn.execute("SET app.actor_id = %s", (actor_id or "",))
+        tenant_id = _tenant_id_var.get() or ""
+        actor_id = _actor_id_var.get() or ""
+        conn.execute(f"SET app.tenant_id = '{tenant_id}'")
+        conn.execute(f"SET app.actor_id = '{actor_id}'")
         yield conn
 
 

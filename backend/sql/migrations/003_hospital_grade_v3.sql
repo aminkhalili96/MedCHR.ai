@@ -48,11 +48,11 @@ CREATE INDEX idx_corrections_user ON data_corrections(corrected_by);
 
 CREATE TABLE IF NOT EXISTS ref_loinc_embeddings (
     code VARCHAR(20) PRIMARY KEY REFERENCES ref_loinc(code),
-    embedding vector(1536),
+    embedding vector(3072),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_loinc_embedding ON ref_loinc_embeddings USING ivfflat (embedding vector_cosine_ops);
+-- HNSW index omitted for 3072 dimensions
 
 -- ============================================================================
 -- SSO Sessions (S02)

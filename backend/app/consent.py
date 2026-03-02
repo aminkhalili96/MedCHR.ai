@@ -6,7 +6,8 @@ Manages patient consent records for data processing.
 Gap Reference: S10
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from contextlib import contextmanager
 from typing import Optional
 from enum import Enum
 
@@ -26,6 +27,16 @@ class ConsentStatus(str, Enum):
     EXPIRED = "expired"
 
 
+@contextmanager
+def _connection_scope(conn=None):
+    if conn is not None:
+        yield conn
+        return
+    from .db import get_conn
+    with get_conn() as managed_conn:
+        yield managed_conn
+
+
 def record_consent(
     patient_id: str,
     consent_type: ConsentType,
@@ -39,33 +50,28 @@ def record_consent(
     """
     Record patient consent.
     """
-    from .db import get_conn
-    
-    if conn is None:
-        conn = get_conn()
-    
-    expires_at = datetime.utcnow() + timedelta(days=expiry_days) if expiry_days else None
-    
-    result = conn.execute("""
-        INSERT INTO patient_consents (
-            patient_id, consent_type, granted, granted_by,
-            granted_at, expires_at, document_url, notes
-        )
-        VALUES (%s, %s, %s, %s, NOW(), %s, %s, %s)
-        ON CONFLICT (patient_id, consent_type) DO UPDATE SET
-            granted = EXCLUDED.granted,
-            granted_by = EXCLUDED.granted_by,
-            granted_at = NOW(),
-            expires_at = EXCLUDED.expires_at,
-            document_url = EXCLUDED.document_url,
-            notes = EXCLUDED.notes
-        RETURNING id
-    """, (
-        patient_id, consent_type.value, granted, granted_by,
-        expires_at, document_url, notes
-    )).fetchone()
-    
-    conn.commit()
+    expires_at = datetime.now(timezone.utc) + timedelta(days=expiry_days) if expiry_days else None
+    with _connection_scope(conn) as db_conn:
+        result = db_conn.execute("""
+            INSERT INTO patient_consents (
+                patient_id, consent_type, granted, granted_by,
+                granted_at, expires_at, document_url, notes
+            )
+            VALUES (%s, %s, %s, %s, NOW(), %s, %s, %s)
+            ON CONFLICT (patient_id, consent_type) DO UPDATE SET
+                granted = EXCLUDED.granted,
+                granted_by = EXCLUDED.granted_by,
+                granted_at = NOW(),
+                expires_at = EXCLUDED.expires_at,
+                document_url = EXCLUDED.document_url,
+                notes = EXCLUDED.notes
+            RETURNING id
+        """, (
+            patient_id, consent_type.value, granted, granted_by,
+            expires_at, document_url, notes
+        )).fetchone()
+        if conn is None:
+            db_conn.commit()
     return str(result["id"])
 
 
@@ -77,16 +83,12 @@ def check_consent(
     """
     Check if patient has granted consent for a specific type.
     """
-    from .db import get_conn
-    
-    if conn is None:
-        conn = get_conn()
-    
-    row = conn.execute("""
-        SELECT id, granted, granted_by, granted_at, expires_at, notes
-        FROM patient_consents
-        WHERE patient_id = %s AND consent_type = %s
-    """, (patient_id, consent_type.value)).fetchone()
+    with _connection_scope(conn) as db_conn:
+        row = db_conn.execute("""
+            SELECT id, granted, granted_by, granted_at, expires_at, notes
+            FROM patient_consents
+            WHERE patient_id = %s AND consent_type = %s
+        """, (patient_id, consent_type.value)).fetchone()
     
     if not row:
         return {
@@ -96,7 +98,7 @@ def check_consent(
         }
     
     # Check expiry
-    if row["expires_at"] and row["expires_at"] < datetime.utcnow():
+    if row["expires_at"] and row["expires_at"] < datetime.now(timezone.utc):
         return {
             "has_consent": False,
             "status": ConsentStatus.EXPIRED,
@@ -139,22 +141,18 @@ def get_patient_consents(patient_id: str, conn = None) -> list:
     """
     Get all consent records for a patient.
     """
-    from .db import get_conn
-    
-    if conn is None:
-        conn = get_conn()
-    
-    rows = conn.execute("""
-        SELECT consent_type, granted, granted_by, granted_at, expires_at, notes
-        FROM patient_consents
-        WHERE patient_id = %s
-    """, (patient_id,)).fetchall()
+    with _connection_scope(conn) as db_conn:
+        rows = db_conn.execute("""
+            SELECT consent_type, granted, granted_by, granted_at, expires_at, notes
+            FROM patient_consents
+            WHERE patient_id = %s
+        """, (patient_id,)).fetchall()
     
     consents = []
     for row in rows:
         status = ConsentStatus.GRANTED if row["granted"] else ConsentStatus.DENIED
         
-        if row["expires_at"] and row["expires_at"] < datetime.utcnow():
+        if row["expires_at"] and row["expires_at"] < datetime.now(timezone.utc):
             status = ConsentStatus.EXPIRED
         
         consents.append({
@@ -180,18 +178,14 @@ def withdraw_consent(
     """
     Withdraw patient consent.
     """
-    from .db import get_conn
-    
-    if conn is None:
-        conn = get_conn()
-    
-    conn.execute("""
-        UPDATE patient_consents
-        SET granted = FALSE, notes = %s, granted_by = %s, granted_at = NOW()
-        WHERE patient_id = %s AND consent_type = %s
-    """, (f"Withdrawn: {reason}" if reason else "Consent withdrawn", withdrawn_by, patient_id, consent_type.value))
-    
-    conn.commit()
+    with _connection_scope(conn) as db_conn:
+        db_conn.execute("""
+            UPDATE patient_consents
+            SET granted = FALSE, notes = %s, granted_by = %s, granted_at = NOW()
+            WHERE patient_id = %s AND consent_type = %s
+        """, (f"Withdrawn: {reason}" if reason else "Consent withdrawn", withdrawn_by, patient_id, consent_type.value))
+        if conn is None:
+            db_conn.commit()
 
 
 def check_ai_processing_allowed(patient_id: str, conn = None) -> bool:

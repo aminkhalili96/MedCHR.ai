@@ -14,6 +14,7 @@ import json
 import hashlib
 import hmac
 import time
+from contextlib import contextmanager
 from typing import Optional
 from enum import Enum
 
@@ -38,6 +39,15 @@ class WebhookDeliveryStatus(str, Enum):
     RETRYING = "retrying"
 
 
+@contextmanager
+def _connection_scope(conn=None):
+    if conn is not None:
+        yield conn
+        return
+    with get_conn() as managed_conn:
+        yield managed_conn
+
+
 def register_webhook(
     tenant_id: str,
     url: str,
@@ -52,17 +62,15 @@ def register_webhook(
     
     if secret is None:
         secret = secrets.token_hex(32)
-    
-    if conn is None:
-        conn = get_conn()
-    
-    result = conn.execute("""
-        INSERT INTO webhooks (tenant_id, url, events, secret, active)
-        VALUES (%s, %s, %s, %s, TRUE)
-        RETURNING id
-    """, (tenant_id, url, json.dumps(events), secret)).fetchone()
-    
-    conn.commit()
+
+    with _connection_scope(conn) as db_conn:
+        result = db_conn.execute("""
+            INSERT INTO webhooks (tenant_id, url, events, secret, active)
+            VALUES (%s, %s, %s, %s, TRUE)
+            RETURNING id
+        """, (tenant_id, url, json.dumps(events), secret)).fetchone()
+        if conn is None:
+            db_conn.commit()
     return str(result["id"])
 
 
@@ -70,16 +78,13 @@ def get_webhooks_for_event(tenant_id: str, event: str, conn = None) -> list:
     """
     Get all active webhooks subscribed to an event.
     """
-    if conn is None:
-        conn = get_conn()
-    
-    rows = conn.execute("""
-        SELECT id, url, secret
-        FROM webhooks
-        WHERE tenant_id = %s AND active = TRUE
-          AND events @> %s::jsonb
-    """, (tenant_id, json.dumps([event]))).fetchall()
-    
+    with _connection_scope(conn) as db_conn:
+        rows = db_conn.execute("""
+            SELECT id, url, secret
+            FROM webhooks
+            WHERE tenant_id = %s AND active = TRUE
+              AND events @> %s::jsonb
+        """, (tenant_id, json.dumps([event]))).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -103,77 +108,77 @@ async def dispatch_webhook(
     """
     Dispatch a webhook to the registered endpoint.
     """
-    if conn is None:
-        conn = get_conn()
-    
-    # Get webhook details
-    webhook = conn.execute(
-        "SELECT url, secret FROM webhooks WHERE id = %s",
-        (webhook_id,)
-    ).fetchone()
-    
-    if not webhook:
-        return False
-    
-    # Prepare payload
-    full_payload = {
-        "event": event,
-        "timestamp": int(time.time()),
-        "data": payload
-    }
-    payload_json = json.dumps(full_payload, default=str)
-    
-    # Generate signature
-    signature = generate_signature(payload_json, webhook["secret"])
-    
-    # Send webhook
-    headers = {
-        "Content-Type": "application/json",
-        "X-MedCHR-Event": event,
-        "X-MedCHR-Signature": f"sha256={signature}",
-        "X-MedCHR-Timestamp": str(full_payload["timestamp"])
-    }
-    
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                webhook["url"],
-                content=payload_json,
-                headers=headers
-            )
-        
-        status = WebhookDeliveryStatus.SUCCESS if response.is_success else WebhookDeliveryStatus.FAILED
-        
-        # Log delivery
-        conn.execute("""
-            INSERT INTO webhook_deliveries (
-                webhook_id, event, payload, status_code, 
-                response_body, status, delivered_at
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, NOW())
-        """, (
-            webhook_id, event, payload_json,
-            response.status_code, response.text[:1000],
-            status.value
-        ))
-        conn.commit()
-        
-        return response.is_success
-        
-    except Exception as e:
-        # Log failure
-        conn.execute("""
-            INSERT INTO webhook_deliveries (
-                webhook_id, event, payload, status, error, delivered_at
-            )
-            VALUES (%s, %s, %s, %s, %s, NOW())
-        """, (
-            webhook_id, event, payload_json,
-            WebhookDeliveryStatus.FAILED.value, str(e)
-        ))
-        conn.commit()
-        
-        return False
+    with _connection_scope(conn) as db_conn:
+        # Get webhook details
+        webhook = db_conn.execute(
+            "SELECT url, secret FROM webhooks WHERE id = %s",
+            (webhook_id,)
+        ).fetchone()
+
+        if not webhook:
+            return False
+
+        # Prepare payload
+        full_payload = {
+            "event": event,
+            "timestamp": int(time.time()),
+            "data": payload
+        }
+        payload_json = json.dumps(full_payload, default=str)
+
+        # Generate signature
+        signature = generate_signature(payload_json, webhook["secret"])
+
+        # Send webhook
+        headers = {
+            "Content-Type": "application/json",
+            "X-MedCHR-Event": event,
+            "X-MedCHR-Signature": f"sha256={signature}",
+            "X-MedCHR-Timestamp": str(full_payload["timestamp"])
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.post(
+                    webhook["url"],
+                    content=payload_json,
+                    headers=headers
+                )
+
+            status = WebhookDeliveryStatus.SUCCESS if response.is_success else WebhookDeliveryStatus.FAILED
+
+            # Log delivery
+            db_conn.execute("""
+                INSERT INTO webhook_deliveries (
+                    webhook_id, event, payload, status_code, 
+                    response_body, status, delivered_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            """, (
+                webhook_id, event, payload_json,
+                response.status_code, response.text[:1000],
+                status.value
+            ))
+            if conn is None:
+                db_conn.commit()
+
+            return response.is_success
+
+        except Exception as e:
+            # Log failure
+            db_conn.execute("""
+                INSERT INTO webhook_deliveries (
+                    webhook_id, event, payload, status, error, delivered_at
+                )
+                VALUES (%s, %s, %s, %s, %s, NOW())
+            """, (
+                webhook_id, event, payload_json,
+                WebhookDeliveryStatus.FAILED.value, str(e)
+            ))
+            if conn is None:
+                db_conn.commit()
+
+            return False
 
 
 async def dispatch_event(
@@ -185,18 +190,18 @@ async def dispatch_event(
     """
     Dispatch an event to all subscribed webhooks.
     """
-    if conn is None:
-        conn = get_conn()
-    
-    webhooks = get_webhooks_for_event(tenant_id, event.value, conn)
-    
-    for webhook in webhooks:
-        await dispatch_webhook(
-            webhook["id"],
-            event.value,
-            payload,
-            conn
-        )
+    with _connection_scope(conn) as db_conn:
+        webhooks = get_webhooks_for_event(tenant_id, event.value, db_conn)
+
+        for webhook in webhooks:
+            await dispatch_webhook(
+                webhook["id"],
+                event.value,
+                payload,
+                db_conn
+            )
+        if conn is None:
+            db_conn.commit()
 
 
 # Convenience dispatchers

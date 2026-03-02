@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block breadcrumb %}
+<span class="breadcrumb-current">Data</span>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Data</h1>
+    <p class="muted" style="margin: 0;">All patient source files (PDF, image, and written text) with browser preview links.</p>
+  </div>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card">
+    <div class="stat-card-value">{{ patient_groups | length }}</div>
+    <div class="stat-card-label">Patients</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-value">{{ total_files }}</div>
+    <div class="stat-card-label">Total Files</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-value">{{ featured_count }}</div>
+    <div class="stat-card-label">PDF + Image + Text</div>
+  </div>
+</div>
+
+{% if featured_patients %}
+<div class="card" style="margin-bottom: 20px;">
+  <div class="card-header">
+    <h3 class="card-title">Featured Demo Patients (Have PDF + Image + Written Data)</h3>
+    <span class="badge badge-neutral">{{ featured_count }}</span>
+  </div>
+  <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;">
+    {% for item in featured_patients %}
+    <a href="/ui/patients/{{ item.patient_id }}"
+      style="text-decoration: none; font-size: 12px; font-weight: 500; padding: 6px 10px; border-radius: 999px; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A;">
+      {{ item.patient_name }} · {{ item.file_count }} files
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">All Files By Patient</h3>
+  </div>
+
+  {% if patient_groups %}
+  {% for item in patient_groups %}
+  <div style="border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 14px 16px; margin-top: 12px;">
+    <div style="display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap;">
+      <div>
+        <div style="font-weight: 600; color: var(--text-primary);">{{ item.patient_name }}</div>
+        <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">{{ item.file_count }} file{{ 's' if item.file_count != 1 else '' }}</div>
+      </div>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        {% if item.has_all_data_types %}
+        <span style="font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 10px; background: #DCFCE7; color: #166534;">PDF + Image + Text</span>
+        {% endif %}
+        {% if item.pdf_count > 0 %}
+        <span style="font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 10px; background: #DBEAFE; color: #1E3A8A;">PDF {{ item.pdf_count }}</span>
+        {% endif %}
+        {% if item.image_count > 0 %}
+        <span style="font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 10px; background: #FCE7F3; color: #9D174D;">Image {{ item.image_count }}</span>
+        {% endif %}
+        {% if item.text_count > 0 %}
+        <span style="font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 10px; background: #F3E8FF; color: #6B21A8;">Text {{ item.text_count }}</span>
+        {% endif %}
+        {% if item.other_count > 0 %}
+        <span style="font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 10px; background: #E5E7EB; color: #374151;">Other {{ item.other_count }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if item.files %}
+    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+      <thead>
+        <tr style="border-bottom: 1px solid var(--border-light);">
+          <th style="text-align: left; padding: 8px 4px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">File</th>
+          <th style="text-align: left; padding: 8px 4px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Type</th>
+          <th style="text-align: left; padding: 8px 4px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Added</th>
+          <th style="text-align: left; padding: 8px 4px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">View</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for file in item.files %}
+        <tr style="border-bottom: 1px solid var(--border-light);">
+          <td style="padding: 9px 4px; font-size: 13px; color: var(--text-primary);">{{ file.filename }}</td>
+          <td style="padding: 9px 4px; font-size: 12px; color: var(--text-secondary);">{{ file.content_type }}</td>
+          <td style="padding: 9px 4px; font-size: 12px; color: var(--text-muted);">{{ file.created_at.strftime('%Y-%m-%d %H:%M') if file.created_at else '-' }}</td>
+          <td style="padding: 9px 4px;">
+            <a href="/ui/patients/{{ item.patient_id }}/documents/{{ file.document_id }}/view"
+              style="text-decoration: none; font-size: 12px; font-weight: 500; color: var(--accent-primary);">Inspect</a>
+            <span style="color: var(--text-muted); margin: 0 6px;">·</span>
+            <a href="/ui/patients/{{ item.patient_id }}/documents/{{ file.document_id }}/raw" target="_blank"
+              style="text-decoration: none; font-size: 12px; font-weight: 500; color: var(--text-secondary);">Raw</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="margin: 10px 0 0 0; font-size: 12px; color: var(--text-muted);">No uploaded files for this patient yet.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% else %}
+  <p class="section-empty">No patient data available.</p>
+  {% endif %}
+</div>
+{% endblock %}

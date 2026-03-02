@@ -167,17 +167,36 @@ def parse_numeric(value: str) -> Optional[float]:
         return None
 
 
+# Abnormal (warning-level) ranges for common tests — flags values outside
+# the normal reference range even when not immediately life-threatening.
+ABNORMAL_RANGES = {
+    "hemoglobin": {"low": 12.0, "high": 17.5, "unit": "g/dL", "action": "Review for anemia or polycythemia"},
+    "hba1c": {"low": None, "high": 6.5, "unit": "%", "action": "Evaluate glycemic control"},
+    "fasting glucose": {"low": 70, "high": 100, "unit": "mg/dL", "action": "Assess for diabetes or hypoglycemia"},
+    "glucose": {"low": 70, "high": 140, "unit": "mg/dL", "action": "Assess glucose regulation"},
+    "total cholesterol": {"low": None, "high": 200, "unit": "mg/dL", "action": "Lipid management review"},
+    "ldl": {"low": None, "high": 130, "unit": "mg/dL", "action": "Consider statin therapy"},
+    "hdl": {"low": 40, "high": None, "unit": "mg/dL", "action": "Low HDL: cardiovascular risk factor"},
+    "triglycerides": {"low": None, "high": 150, "unit": "mg/dL", "action": "Lifestyle and dietary review"},
+    "creatinine": {"low": 0.6, "high": 1.2, "unit": "mg/dL", "action": "Evaluate renal function"},
+    "cea": {"low": None, "high": 5.0, "unit": "ng/mL", "action": "Elevated tumor marker — further evaluation"},
+    "potassium": {"low": 3.5, "high": 5.0, "unit": "mEq/L", "action": "Monitor electrolyte balance"},
+    "sodium": {"low": 136, "high": 145, "unit": "mEq/L", "action": "Evaluate fluid balance"},
+}
+
+
 def check_critical_values(labs: list[dict]) -> list[dict]:
     """
-    Check lab results against critical value thresholds.
+    Check lab results against critical value thresholds AND abnormal ranges.
     
     Args:
         labs: List of lab results with test_name, value, unit
         
     Returns:
-        List of critical value alerts
+        List of critical/warning value alerts
     """
     alerts = []
+    seen_tests = set()
     
     for lab in labs:
         test_name = str(lab.get("test_name", "")).lower()
@@ -186,7 +205,7 @@ def check_critical_values(labs: list[dict]) -> list[dict]:
         if value is None:
             continue
         
-        # Try to match test name to critical ranges
+        # --- Critical ranges (life-threatening) ---
         for critical_test, ranges in CRITICAL_RANGES.items():
             if critical_test in test_name:
                 is_critical = False
@@ -211,7 +230,35 @@ def check_critical_values(labs: list[dict]) -> list[dict]:
                         "action": ranges["action"],
                         "timestamp": datetime.now().isoformat()
                     })
+                    seen_tests.add(test_name)
                 break
+        
+        # --- Abnormal ranges (warning-level) ---
+        if test_name not in seen_tests:
+            for abnormal_test, ranges in ABNORMAL_RANGES.items():
+                if abnormal_test in test_name:
+                    is_abnormal = False
+                    direction = None
+                    
+                    if ranges["low"] is not None and value < ranges["low"]:
+                        is_abnormal = True
+                        direction = "LOW"
+                    elif ranges["high"] is not None and value > ranges["high"]:
+                        is_abnormal = True
+                        direction = "HIGH"
+                    
+                    if is_abnormal:
+                        alerts.append({
+                            "test": lab.get("test_name"),
+                            "value": value,
+                            "unit": lab.get("unit", ranges.get("unit", "")),
+                            "severity": "WARNING",
+                            "direction": direction,
+                            "action": ranges["action"],
+                            "timestamp": datetime.now().isoformat()
+                        })
+                        seen_tests.add(test_name)
+                    break
     
     return alerts
 

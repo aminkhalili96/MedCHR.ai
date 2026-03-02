@@ -13,11 +13,14 @@ from backend.scripts.validate_runtime_policy import validate_runtime_policy
 from backend.scripts.verify_audit_chain import verify_chain
 
 INSECURE_APP_SECRETS = {"", "dev-secret", "change-me", "changeme", "default"}
+SCRIPT_DIR = Path(__file__).resolve().parent
+BACKEND_DIR = SCRIPT_DIR.parent
+REPO_ROOT = BACKEND_DIR.parent
 REQUIRED_RUNBOOKS = (
-    "doc/runbooks/key_rotation.md",
-    "doc/runbooks/access_review.md",
-    "doc/runbooks/incident_response.md",
-    "doc/runbooks/breach_notification.md",
+    Path("doc/runbooks/key_rotation.md"),
+    Path("doc/runbooks/access_review.md"),
+    Path("doc/runbooks/incident_response.md"),
+    Path("doc/runbooks/breach_notification.md"),
 )
 
 
@@ -217,7 +220,7 @@ def collect_control_validation(*, require_db: bool = False) -> dict[str, Any]:
             remediation="Keep immutable exports enabled for retention workflows.",
         )
 
-    missing_runbooks = [path for path in REQUIRED_RUNBOOKS if not Path(path).exists()]
+    missing_runbooks = [str(path) for path in REQUIRED_RUNBOOKS if not (REPO_ROOT / path).exists()]
     _add_check(
         checks,
         control_id="C-OPS-001",
@@ -229,7 +232,7 @@ def collect_control_validation(*, require_db: bool = False) -> dict[str, Any]:
         remediation="Create and maintain incident, breach, key rotation, and access review runbooks.",
     )
 
-    llm_import_violations = find_llm_gateway_violations(scan_root=Path("backend/app"))
+    llm_import_violations = find_llm_gateway_violations(scan_root=REPO_ROOT / "backend" / "app")
     _add_check(
         checks,
         control_id="C-APP-004",
@@ -246,8 +249,8 @@ def collect_control_validation(*, require_db: bool = False) -> dict[str, Any]:
     )
 
     runtime_policy = validate_runtime_policy(
-        dockerfile_path=Path("Dockerfile"),
-        requirements_path=Path("backend/requirements.txt"),
+        dockerfile_path=REPO_ROOT / "Dockerfile",
+        requirements_path=REPO_ROOT / "backend" / "requirements.txt",
     )
     runtime_failures = [item["id"] for item in runtime_policy["checks"] if item["status"] == "FAIL"]
     _add_check(

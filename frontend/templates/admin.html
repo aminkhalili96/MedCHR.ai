@@ -1,9 +1,36 @@
 {% extends "base.html" %}
+{% block breadcrumb %}
+<span class="breadcrumb-current">Admin</span>
+{% endblock %}
 {% block content %}
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
     <div>
         <h1 style="margin: 0;">Admin Dashboard</h1>
-        <p class="muted" style="margin: 4px 0 0 0;">Manage users and tenant settings</p>
+        <p class="muted" style="margin: 4px 0 0 0;">Manage users and system health</p>
+    </div>
+</div>
+
+<div class="grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 24px;">
+    <div class="card" style="padding: 20px;">
+        <div
+            style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: 500; letter-spacing: 0.05em; margin-bottom: 8px;">
+            Total CHR Reports</div>
+        <div style="font-size: 32px; font-weight: 600; color: var(--text-primary);">{{ metrics.total_reports or 0 }}
+        </div>
+    </div>
+    <div class="card" style="padding: 20px;">
+        <div
+            style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: 500; letter-spacing: 0.05em; margin-bottom: 8px;">
+            Documents Processed</div>
+        <div style="font-size: 32px; font-weight: 600; color: var(--text-primary);">{{ metrics.total_documents or 0 }}
+        </div>
+    </div>
+    <div class="card" style="padding: 20px;">
+        <div
+            style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; font-weight: 500; letter-spacing: 0.05em; margin-bottom: 8px;">
+            Extractions Completed</div>
+        <div style="font-size: 32px; font-weight: 600; color: var(--text-primary);">{{ metrics.total_extractions or 0 }}
+        </div>
     </div>
 </div>
 
@@ -57,6 +84,8 @@
                 <th style="padding: 12px; font-weight: 600; font-size: 13px; color: var(--text-secondary);">User</th>
                 <th style="padding: 12px; font-weight: 600; font-size: 13px; color: var(--text-secondary);">Role</th>
                 <th style="padding: 12px; font-weight: 600; font-size: 13px; color: var(--text-secondary);">Joined</th>
+                <th style="padding: 12px; font-weight: 600; font-size: 13px; color: var(--text-secondary);">Last Active
+                </th>
             </tr>
         </thead>
         <tbody>
@@ -73,41 +102,29 @@
                 <td style="padding: 12px; color: var(--text-muted); font-size: 13px;">
                     {{ u.created_at.strftime('%Y-%m-%d') }}
                 </td>
+                <td style="padding: 12px; color: var(--text-muted); font-size: 13px;">
+                    {% if u.last_active %}
+                    {{ u.last_active.strftime('%Y-%m-%d %H:%M') }}
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
     {% else %}
     <div class="empty-state">
-        <div class="empty-state-icon">👥</div>
+        <div class="empty-state-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="1.5">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg></div>
         <p>No users found</p>
     </div>
     {% endif %}
 </div>
 
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title">Tenant IP Allowlist</h3>
-    </div>
-    <p class="muted" style="margin-top: 0;">
-        One IP or CIDR per line. Leave empty to allow all source IPs.
-    </p>
-    {% if allowlist_error %}
-    <div class="alert alert-danger" style="margin-bottom: 12px;">{{ allowlist_error }}</div>
-    {% endif %}
-    <form method="post" action="/ui/admin/ip-allowlist">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <label for="ip_whitelist">Allowed IPs / CIDRs</label>
-        <textarea
-            id="ip_whitelist"
-            name="ip_whitelist"
-            rows="6"
-            placeholder="203.0.113.10&#10;198.51.100.0/24"
-            style="width: 100%;"
-        >{{ ip_whitelist_text or '' }}</textarea>
-        <div class="mt-md">
-            <button type="submit">Save Allowlist</button>
-        </div>
-    </form>
-</div>
 {% endblock %}

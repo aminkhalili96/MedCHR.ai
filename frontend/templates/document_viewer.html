@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+    .doc-viewer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .doc-viewer-header h1 {
+        font-size: 20px;
+        margin: 0;
+    }
+
+    .doc-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 4px 10px;
+        border-radius: 4px;
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+    }
+
+    .doc-content-card {
+        background: var(--bg-white);
+        border: 1px solid var(--border-secondary);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+    }
+
+    .doc-content-tabs {
+        display: flex;
+        background: var(--bg-tertiary);
+        border-bottom: 1px solid var(--border-secondary);
+    }
+
+    .doc-content-tab {
+        padding: 10px 20px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-muted);
+        cursor: pointer;
+        border: none;
+        background: none;
+        font-family: inherit;
+        border-bottom: 2px solid transparent;
+        transition: all 0.15s;
+    }
+
+    .doc-content-tab:hover {
+        color: var(--text-primary);
+    }
+
+    .doc-content-tab.active {
+        color: var(--text-primary);
+        background: var(--bg-white);
+        border-bottom-color: var(--accent-primary);
+    }
+
+    .doc-panel {
+        display: none;
+        padding: 24px;
+    }
+
+    .doc-panel.active {
+        display: block;
+    }
+
+    .doc-raw-text {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+        font-size: 13px;
+        line-height: 1.7;
+        color: var(--text-primary);
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-light);
+        border-radius: var(--radius-sm);
+        padding: 20px;
+        max-height: 700px;
+        overflow-y: auto;
+    }
+
+    .doc-structured-section {
+        margin-bottom: 20px;
+    }
+
+    .doc-structured-section h4 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+        margin: 0 0 12px 0;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .doc-structured-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+
+    .doc-structured-table th {
+        text-align: left;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border-secondary);
+        font-weight: 500;
+        background: var(--bg-tertiary);
+    }
+
+    .doc-structured-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border-light);
+        color: var(--text-primary);
+    }
+
+    .doc-structured-table tr:hover td {
+        background: rgba(31, 30, 29, 0.02);
+    }
+
+    .doc-preview-frame {
+        width: 100%;
+        min-height: 600px;
+        border: none;
+        border-radius: var(--radius-sm);
+        background: var(--bg-tertiary);
+    }
+
+    .doc-empty {
+        text-align: center;
+        padding: 48px 24px;
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .flag-high {
+        color: #b91c1c;
+        font-weight: 600;
+    }
+
+    .flag-low {
+        color: #b45309;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div style="margin-bottom: 16px;">
+    <a href="/ui" style="color: var(--text-muted); font-size: 13px; text-decoration: none;">Patients</a>
+    <span style="color: var(--text-muted); font-size: 13px; margin: 0 6px;">/</span>
+    <a href="/ui/patients/{{ patient.id }}" style="color: var(--text-muted); font-size: 13px; text-decoration: none;">{{
+        patient.full_name }}</a>
+    <span style="color: var(--text-muted); font-size: 13px; margin: 0 6px;">/</span>
+    <span style="color: var(--text-secondary); font-size: 13px;">{{ document.filename }}</span>
+</div>
+
+<div class="doc-viewer-header">
+    <div>
+        <h1>{{ document.filename }}</h1>
+        <div style="display: flex; gap: 8px; margin-top: 6px;">
+            <span class="doc-badge">
+                {% if 'pdf' in document.content_type %}PDF Document
+                {% elif 'image' in document.content_type %}Image File
+                {% elif 'text' in document.content_type %}Text Document
+                {% else %}{{ document.content_type }}{% endif %}
+            </span>
+            {% if raw_text %}<span class="doc-badge" style="background: #DCFCE7; color: #16A34A;">Extracted</span>{%
+            endif %}
+        </div>
+    </div>
+    <div style="display: flex; gap: 8px;">
+        <a href="/ui/patients/{{ patient.id }}" class="btn-secondary"
+            style="text-decoration: none; font-size: 13px; padding: 8px 16px;">Back to Patient</a>
+    </div>
+</div>
+
+<div class="doc-content-card">
+    <div class="doc-content-tabs" id="docTabs">
+        {% if raw_text %}
+        <button class="doc-content-tab active" data-tab="extracted">Extracted Text</button>
+        {% endif %}
+        {% if structured %}
+        <button class="doc-content-tab{% if not raw_text %} active{% endif %}" data-tab="structured">Structured
+            Data</button>
+        {% endif %}
+        {% if 'pdf' in document.content_type or 'image' in document.content_type %}
+        <button class="doc-content-tab{% if not raw_text and not structured %} active{% endif %}"
+            data-tab="preview">Original Preview</button>
+        {% endif %}
+    </div>
+
+    <!-- Extracted Text Panel -->
+    {% if raw_text %}
+    <div class="doc-panel active" id="panel-extracted">
+        <div class="doc-raw-text">{{ raw_text }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Structured Data Panel -->
+    {% if structured %}
+    <div class="doc-panel{% if not raw_text %} active{% endif %}" id="panel-structured">
+        {% if structured.labs or structured.biomarkers %}
+        <div class="doc-structured-section">
+            <h4>Lab Results</h4>
+            <table class="doc-structured-table">
+                <thead>
+                    <tr>
+                        <th>Test</th>
+                        <th>Value</th>
+                        <th>Unit</th>
+                        <th>Flag</th>
+                        <th>Reference</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lab in (structured.labs or structured.biomarkers or []) %}
+                    <tr>
+                        <td style="font-weight: 500;">{{ lab.test or lab.test_name or lab.name or 'Unlabeled' }}</td>
+                        <td>{{ lab.value or '-' }}</td>
+                        <td>{{ lab.unit or '-' }}</td>
+                        <td>
+                            {% set f = (lab.flag or '')|upper %}
+                            {% if f in ['H', 'HIGH'] %}<span class="flag-high">High</span>
+                            {% elif f in ['L', 'LOW'] %}<span class="flag-low">Low</span>
+                            {% else %}{{ lab.flag or '-' }}{% endif %}
+                        </td>
+                        <td style="color: var(--text-muted);">{{ lab.range or lab.reference_range or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if structured.medications %}
+        <div class="doc-structured-section">
+            <h4>Medications</h4>
+            <table class="doc-structured-table">
+                <thead>
+                    <tr>
+                        <th>Medication</th>
+                        <th>Dosage</th>
+                        <th>Frequency</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for med in structured.medications %}
+                    <tr>
+                        <td style="font-weight: 500;">{{ med.name or med }}</td>
+                        <td>{{ med.dosage or '-' }}</td>
+                        <td>{{ med.frequency or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if structured.diagnoses %}
+        <div class="doc-structured-section">
+            <h4>Diagnoses</h4>
+            <table class="doc-structured-table">
+                <thead>
+                    <tr>
+                        <th>Condition</th>
+                        <th>ICD Code</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dx in structured.diagnoses %}
+                    <tr>
+                        <td style="font-weight: 500;">{{ dx.condition or dx }}</td>
+                        <td>{{ dx.code or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if not structured.labs and not structured.biomarkers and not structured.medications and not
+        structured.diagnoses %}
+        <div class="doc-empty">No structured data was extracted from this document.</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Original Preview Panel -->
+    {% if 'pdf' in document.content_type or 'image' in document.content_type %}
+    <div class="doc-panel{% if not raw_text and not structured %} active{% endif %}" id="panel-preview">
+        {% if 'image' in document.content_type %}
+        <div style="text-align: center; padding: 20px;">
+            <img src="/ui/patients/{{ patient.id }}/documents/{{ document.id }}/raw" alt="{{ document.filename }}"
+                style="max-width: 100%; max-height: 700px; border-radius: var(--radius-sm); box-shadow: var(--shadow-md);" />
+        </div>
+        {% elif 'pdf' in document.content_type %}
+        <iframe src="/ui/patients/{{ patient.id }}/documents/{{ document.id }}/raw" class="doc-preview-frame"></iframe>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if not raw_text and not structured and 'pdf' not in document.content_type and 'image' not in
+    document.content_type %}
+    <div class="doc-panel active">
+        <div class="doc-empty">
+            <p>No preview available for this document type.</p>
+            <p style="margin-top: 8px; font-size: 13px;">The document has been processed and its data is included in the
+                patient's records.</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script nonce="{{ csp_nonce }}">
+    document.querySelectorAll('.doc-content-tab').forEach(tab => {
+        tab.addEventListener('click', function () {
+            document.querySelectorAll('.doc-content-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.doc-panel').forEach(p => p.classList.remove('active'));
+            this.classList.add('active');
+            document.getElementById('panel-' + this.dataset.tab).classList.add('active');
+        });
+    });
+</script>
+{% endblock %}

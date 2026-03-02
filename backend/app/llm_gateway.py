@@ -19,12 +19,15 @@ def get_openai_client(*, timeout_seconds: int | None = None) -> OpenAI:
     - Uses the configured request timeout.
     """
     settings = get_settings()
-    if not settings.openai_api_key:
-        raise RuntimeError("OPENAI_API_KEY not configured.")
+    if not settings.mistral_api_key:
+        raise RuntimeError("MISTRAL_API_KEY not configured.")
     if settings.hipaa_mode:
         ensure_phi_processor("openai")
     timeout = timeout_seconds if timeout_seconds is not None else settings.openai_timeout_seconds
-    return OpenAI(api_key=settings.openai_api_key, timeout=timeout)
+    kwargs = {"api_key": settings.mistral_api_key, "timeout": timeout}
+    if settings.openai_base_url:
+        kwargs["base_url"] = settings.openai_base_url
+    return OpenAI(**kwargs)
 
 
 def redact_if_enabled(text: str) -> str:

@@ -35,7 +35,6 @@ class Document(BaseModel):
 class SignedUploadRequest(BaseModel):
     filename: str = Field(..., min_length=1)
     content_type: Optional[str] = None
-    expires_in_seconds: int = Field(default=600, ge=60, le=3600)
 
 
 class SignedUploadRegistration(BaseModel):
@@ -51,7 +50,6 @@ class SignedUploadResponse(BaseModel):
     storage_path: str
     upload_url: str
     upload_token: str
-    expires_in_seconds: int
 
 
 class SignedDownloadResponse(BaseModel):

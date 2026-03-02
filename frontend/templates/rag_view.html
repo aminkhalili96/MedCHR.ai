@@ -83,7 +83,11 @@
   </div>
   {% else %}
   <div class="empty-state">
-    <div class="empty-state-icon">🔍</div>
+    <div class="empty-state-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="1.5">
+        <circle cx="11" cy="11" r="8" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </svg></div>
     <p style="font-size: 14px; color: var(--text-secondary);">No chunks found</p>
     <p style="font-size: 13px; color: var(--text-muted);">Run extraction and embeddings on documents first, then try a
       query</p>

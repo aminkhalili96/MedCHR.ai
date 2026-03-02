@@ -1,6 +1,18 @@
-# MedCHR MVP
+# MedCHR.ai
 
 Clinician-in-the-loop pipeline for turning raw patient records into editable Client Health Reports (CHRs).
+
+## Recent Changes (2026-03-01)
+- **Bug fix**: Fixed 500 Internal Server Error on all authenticated pages. Root cause: `ip_whitelist.py` queried non-existent `ip_whitelist` column; corrected to use `allowed_ips` (PostgreSQL ARRAY type).
+- **Bug fix**: Fixed psycopg `IndeterminateDatatype` error on patient detail page. Replaced `(%s IS NULL OR p.tenant_id = %s)` SQL pattern with conditional query branches in `_list_documents`, `_latest_extraction`, and `_aggregate_structured`.
+- **Gap Features API**: Added clinical analytics endpoints (`/api/gap/`) for longitudinal trends, patient timeline, diagnosis suggestions, genetics interpretation, drug interactions, and clinical rules.
+- **Data generation**: Added `generate_4_serangkai` script for simulating realistic patient histories with hypertension, diabetes, hyperlipidemia, and obesity data.
+
+### Previous Changes (2026-02-12)
+- Presigned upload API contract tightened.
+- Control validation and LLM gateway validation scripts made execution-path stable.
+- Consent/webhook/IP allowlist helpers now correctly manage DB connections.
+- Consent expiry checks use timezone-aware UTC comparison.
 
 ## Quick Start
 Run all commands from the project root (one level up from this file).
@@ -71,7 +83,7 @@ uvicorn app.main:app --app-dir backend --reload
 - Visit `http://127.0.0.1:8000/ui`
 - Create a tenant + first admin user (once):
   - `python -m backend.scripts.bootstrap_admin`
-- Login with the admin email/password you bootstrapped
+- **Dev credentials**: `admin@medchr.ai` / `admin` (created by bootstrap)
 - Embeddings debug: `http://127.0.0.1:8000/ui/embeddings`
 - RAG viewer: open a patient and click “View RAG Top-K Chunks”
 
@@ -166,7 +178,7 @@ python -m backend.scripts.backup_restore_drill --output-dir data/drills/backup_r
 - `POST /patients` — create patient
 - `DELETE /patients/{patient_id}` — delete patient + documents
 - `POST /patients/{patient_id}/documents` — upload document
-- `POST /patients/{patient_id}/documents/presign-upload` — issue signed upload URL/token
+- `POST /patients/{patient_id}/documents/presign-upload` — issue signed upload URL/token (request: `filename`, optional `content_type`)
 - `POST /patients/{patient_id}/documents/register-upload` — register presigned upload as a document
 - `DELETE /documents/{document_id}` — delete document + storage
 - `GET /documents/{document_id}/download-url` — issue signed download URL
@@ -174,6 +186,14 @@ python -m backend.scripts.backup_restore_drill --output-dir data/drills/backup_r
 - `POST /documents/{document_id}/embed` — store embeddings in pgvector
 - `POST /chr/draft` — generate CHR draft
 - `GET /jobs/{job_id}` — check async job status
+
+### Gap Features (Clinical Analytics)
+- `GET /api/gap/patients/{patient_id}/trends` — longitudinal lab trends
+- `GET /api/gap/patients/{patient_id}/timeline` — patient event timeline
+- `GET /api/gap/patients/{patient_id}/suggestions` — AI diagnosis suggestions
+- `GET /api/gap/patients/{patient_id}/genetics` — genetics interpretation
+- `GET /api/gap/patients/{patient_id}/drug-interactions` — drug-gene interactions
+- `GET /api/gap/patients/{patient_id}/insights` — clinical rules engine
 
 ## OCR Notes
 This MVP uses Tesseract. Install it (macOS):

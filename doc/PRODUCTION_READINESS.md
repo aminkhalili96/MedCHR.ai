@@ -2,6 +2,12 @@
 
 This document captures the production hardening steps added to MedCHR and the operational expectations for HIPAA-mode deployments.
 
+## Recent Changes (2026-02-12)
+- Presigned upload endpoint contract now excludes client-supplied upload TTL (`expires_in_seconds`) for `POST /patients/{patient_id}/documents/presign-upload`; expiration is controlled by the storage provider.
+- `validate_controls` and `validate_llm_gateway_usage` now use repository-anchored paths, removing CWD-dependent false failures.
+- Connection handling was corrected for `consent`, `webhooks`, and tenant IP allowlist utility paths when no explicit DB connection is provided.
+- Consent expiry evaluation uses timezone-aware UTC timestamps to avoid runtime datetime comparison errors.
+
 ## HIPAA Mode & PHI Processors
 - `HIPAA_MODE=true` turns on stricter startup checks and secure session defaults.
 - `PHI_PROCESSORS` is the allowlist of vendors that will receive PHI (e.g., `openai,supabase`).

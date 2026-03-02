@@ -39,7 +39,6 @@ def generate_chr_draft(
             {"role": "system", "content": system},
             {"role": "user", "content": str(user)},
         ],
-        response_format={"type": "json_object"},
     )
 
     content = resp.choices[0].message.content or ""

@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MedCHR.ai - UI Preview</title>
+  <meta name="description" content="AI-powered Client Health Reports for clinicians" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================
+         MedCHR.ai Design System (Anthropic-Inspired)
+         ============================================ */
+
+    :root {
+      /* Colors - Anthropic-inspired warm, professional palette */
+      --bg-primary: #FAF9F6;
+      --bg-secondary: #FFFFFF;
+      --bg-tertiary: #F5F3EE;
+      --bg-hover: #EFECEA;
+
+      --text-primary: #191919;
+      --text-secondary: #4A4A4A;
+      --text-muted: #8B8B8B;
+
+      --accent-primary: #D97757;
+      --accent-hover: #C5684A;
+      --accent-light: #FDF6F3;
+
+      --success: #2D7A5F;
+      --success-light: #E8F5EE;
+      --warning: #D4A017;
+      --warning-light: #FEF9E7;
+      --error: #C94A4A;
+      --error-light: #FDF2F2;
+
+      --border: #D9D6D0;
+      --border-light: #E8E6E0;
+
+      /* Shadows with warm undertones */
+      --shadow-xs: 0 1px 2px rgba(25, 25, 25, 0.04);
+      --shadow-sm: 0 2px 4px rgba(25, 25, 25, 0.06);
+      --shadow-md: 0 4px 12px rgba(25, 25, 25, 0.08);
+      --shadow-lg: 0 8px 24px rgba(25, 25, 25, 0.12);
+
+      /* Spacing - generous, breathable */
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 16px;
+      --space-lg: 24px;
+      --space-xl: 32px;
+      --space-2xl: 48px;
+      --space-3xl: 64px;
+      --space-4xl: 96px;
+
+      /* Radius */
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-full: 9999px;
+
+      /* Typography - fluid, responsive */
+      --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-size-xs: 13px;
+      --font-size-sm: 14px;
+      --font-size-base: clamp(16px, 1vw + 14px, 17px);
+      --font-size-md: 18px;
+      --font-size-lg: 20px;
+      --font-size-xl: 24px;
+      --font-size-2xl: 32px;
+      --font-size-3xl: 40px;
+
+      --line-height-tight: 1.25;
+      --line-height-normal: 1.5;
+      --line-height-relaxed: 1.75;
+
+      /* Transitions - Anthropic's signature easing */
+      --ease-anthropic: cubic-bezier(0.16, 1, 0.3, 1);
+      --transition-fast: 150ms var(--ease-anthropic);
+      --transition-base: 250ms var(--ease-anthropic);
+      --transition-slow: 400ms var(--ease-anthropic);
+    }
+
+    /* Reset & Base */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-family);
+      font-size: var(--font-size-base);
+      line-height: var(--line-height-normal);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-lg) clamp(var(--space-xl), 5vw, var(--space-3xl));
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-light);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      font-weight: 700;
+      font-size: var(--font-size-lg);
+      color: var(--text-primary);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--accent-primary), #E89A7E);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: var(--font-size-md);
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: var(--space-sm) var(--space-lg);
+      border-radius: var(--radius-full);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      transition: all var(--transition-fast);
+    }
+
+    nav a:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    nav a.active {
+      background: var(--accent-light);
+      color: var(--accent-primary);
+    }
+
+    .nav-divider {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+      margin: 0 var(--space-sm);
+    }
+
+    /* Main Content */
+    main {
+      padding: clamp(var(--space-xl), 5vw, var(--space-4xl)) clamp(var(--space-xl), 5vw, var(--space-3xl));
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Page Header */
+    .page-header {
+      margin-bottom: var(--space-3xl);
+    }
+
+    .page-title {
+      font-size: var(--font-size-3xl);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin: 0 0 var(--space-md) 0;
+      color: var(--text-primary);
+    }
+
+    .page-description {
+      font-size: var(--font-size-md);
+      color: var(--text-secondary);
+      margin: 0;
+      line-height: var(--line-height-relaxed);
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-xl);
+      margin-bottom: var(--space-lg);
+      box-shadow: var(--shadow-xs);
+      transition: all var(--transition-base);
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-lg);
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .card-title {
+      font-size: var(--font-size-lg);
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    .card-content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    /* Buttons */
+    button,
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+      padding: var(--space-md) var(--space-xl);
+      border: none;
+      border-radius: var(--radius-full);
+      font-family: var(--font-family);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition-base);
+      text-decoration: none;
+      box-shadow: var(--shadow-xs);
+    }
+
+    .btn-primary {
+      background: var(--accent-primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-hover);
+      border-color: var(--text-muted);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      box-shadow: none;
+    }
+
+    .btn-ghost:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    /* Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: var(--space-lg);
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--space-lg);
+      margin-bottom: var(--space-2xl);
+    }
+
+    .stat-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      box-shadow: var(--shadow-xs);
+    }
+
+    .stat-label {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin-bottom: var(--space-xs);
+      font-weight: 500;
+    }
+
+    .stat-value {
+      font-size: var(--font-size-2xl);
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    /* Patient List */
+    .patient-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-lg);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-md);
+      transition: all var(--transition-base);
+      cursor: pointer;
+    }
+
+    .patient-item:hover {
+      background: var(--bg-tertiary);
+      transform: translateX(4px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .patient-info {
+      display: flex;
+      align-items: center;
+      gap: var(--space-lg);
+    }
+
+    .patient-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-primary), #E89A7E);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: var(--font-size-md);
+    }
+
+    .patient-details h3 {
+      margin: 0 0 var(--space-xs) 0;
+      font-size: var(--font-size-md);
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .patient-meta {
+      display: flex;
+      gap: var(--space-md);
+      font-size: var(--font-size-sm);
+      color: var(--text-muted);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: var(--radius-full);
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    .badge-success {
+      background: var(--success-light);
+      color: var(--success);
+      border: 1px solid color-mix(in srgb, var(--success) 20%, transparent);
+    }
+
+    .badge-warning {
+      background: var(--warning-light);
+      color: var(--warning);
+      border: 1px solid color-mix(in srgb, var(--warning) 20%, transparent);
+    }
+
+    .badge-neutral {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    /* Action Bar */
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-md);
+      margin-bottom: var(--space-2xl);
+    }
+
+    .search-box {
+      flex: 1;
+      max-width: 400px;
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: var(--space-md) var(--space-lg);
+      padding-left: var(--space-3xl);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      font-size: var(--font-size-sm);
+      transition: all var(--transition-base);
+    }
+
+    .search-box input:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 4px var(--accent-light);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: var(--space-lg);
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .action-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .search-box {
+        max-width: 100%;
+      }
+
+      nav {
+        display: none;
+      }
+    }
+
+    /* Accessibility */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    button:focus-visible,
+    a:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 3px;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <a href="#" class="logo">
+      <div class="logo-icon">M</div>
+      <span>MedCHR.ai</span>
+    </a>
+    <nav>
+      <a href="#" class="active">Patients</a>
+      <span class="nav-divider"></span>
+      <a href="#" class="btn-ghost">Security</a>
+      <a href="#" class="btn-ghost">Logout</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Page Header -->
+    <div class="page-header">
+      <h1 class="page-title">Patient Dashboard</h1>
+      <p class="page-description">
+        Manage patient records and generate AI-powered Client Health Reports with full citation tracking.
+      </p>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Patients</div>
+        <div class="stat-value">247</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active Reports</div>
+        <div class="stat-value">38</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pending Reviews</div>
+        <div class="stat-value">12</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Completed Today</div>
+        <div class="stat-value">5</div>
+      </div>
+    </div>
+
+    <!-- Action Bar -->
+    <div class="action-bar">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" placeholder="Search patients by name, MRN, or condition..." />
+      </div>
+      <button class="btn-primary">+ New Patient</button>
+    </div>
+
+    <!-- Recent Patients -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Recent Patients</h2>
+        <span class="badge badge-neutral">Last 7 days</span>
+      </div>
+      <div class="card-content">
+        <div class="patient-item">
+          <div class="patient-info">
+            <div class="patient-avatar">JD</div>
+            <div class="patient-details">
+              <h3>John Doe</h3>
+              <div class="patient-meta">
+                <span>MRN: 12345</span>
+                <span>•</span>
+                <span>DOB: 1978-05-15</span>
+                <span>•</span>
+                <span>Last visit: 2 days ago</span>
+              </div>
+            </div>
+          </div>
+          <span class="badge badge-success">Report Ready</span>
+        </div>
+
+        <div class="patient-item">
+          <div class="patient-info">
+            <div class="patient-avatar">SK</div>
+            <div class="patient-details">
+              <h3>Sarah Kim</h3>
+              <div class="patient-meta">
+                <span>MRN: 12346</span>
+                <span>•</span>
+                <span>DOB: 1985-11-22</span>
+                <span>•</span>
+                <span>Last visit: 5 days ago</span>
+              </div>
+            </div>
+          </div>
+          <span class="badge badge-warning">Processing</span>
+        </div>
+
+        <div class="patient-item">
+          <div class="patient-info">
+            <div class="patient-avatar">MP</div>
+            <div class="patient-details">
+              <h3>Maria Patel</h3>
+              <div class="patient-meta">
+                <span>MRN: 12347</span>
+                <span>•</span>
+                <span>DOB: 1992-03-08</span>
+                <span>•</span>
+                <span>Last visit: 1 week ago</span>
+              </div>
+            </div>
+          </div>
+          <span class="badge badge-success">Report Ready</span>
+        </div>
+
+        <div class="patient-item">
+          <div class="patient-info">
+            <div class="patient-avatar">TC</div>
+            <div class="patient-details">
+              <h3>Thomas Chen</h3>
+              <div class="patient-meta">
+                <span>MRN: 12348</span>
+                <span>•</span>
+                <span>DOB: 1965-09-14</span>
+                <span>•</span>
+                <span>Last visit: 3 days ago</span>
+              </div>
+            </div>
+          </div>
+          <span class="badge badge-warning">Under Review</span>
+        </div>
+
+        <div class="patient-item">
+          <div class="patient-info">
+            <div class="patient-avatar">AL</div>
+            <div class="patient-details">
+              <h3>Amanda Lee</h3>
+              <div class="patient-meta">
+                <span>MRN: 12349</span>
+                <span>•</span>
+                <span>DOB: 1988-07-30</span>
+                <span>•</span>
+                <span>Last visit: 4 days ago</span>
+              </div>
+            </div>
+          </div>
+          <span class="badge badge-success">Report Ready</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">📊 Analytics</h3>
+        </div>
+        <p style="color: var(--text-secondary); margin-bottom: var(--space-lg);">
+          View report generation trends, processing times, and clinician activity metrics.
+        </p>
+        <button class="btn-secondary">View Analytics</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">🔒 Security Settings</h3>
+        </div>
+        <p style="color: var(--text-secondary); margin-bottom: var(--space-lg);">
+          Manage MFA, session timeouts, IP allowlists, and audit log access.
+        </p>
+        <button class="btn-secondary">Configure Security</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">📄 Compliance Reports</h3>
+        </div>
+        <p style="color: var(--text-secondary); margin-bottom: var(--space-lg);">
+          Generate HIPAA compliance evidence packs and audit chain verification.
+        </p>
+        <button class="btn-secondary">Generate Report</button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Interactive demo
+    document.querySelectorAll('.patient-item').forEach(item => {
+      item.addEventListener('click', () => {
+        alert('In the full application, this would navigate to the patient detail page.');
+      });
+    });
+
+    document.querySelector('.btn-primary').addEventListener('click', () => {
+      alert('In the full application, this would open the new patient form.');
+    });
+  </script>
+</body>
+
+</html>

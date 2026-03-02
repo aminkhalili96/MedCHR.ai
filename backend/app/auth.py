@@ -2,14 +2,15 @@ from datetime import datetime
 from uuid import UUID
 from typing import Optional
 from pydantic import BaseModel, EmailStr
-from passlib.context import CryptContext
+import bcrypt
+
 from fastapi import Request, HTTPException, Depends, status
 from psycopg.rows import dict_row
 from .db import get_conn, set_actor_context, set_tenant_context
 from .ip_whitelist import check_tenant_ip_access, extract_client_ip
 from .crypto import decrypt_value, encrypt_value
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 class User(BaseModel):
     id: UUID
@@ -26,10 +27,15 @@ class UserCreate(BaseModel):
     role: str = "clinician"
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except Exception:
+        return False
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
 
 def get_user_by_email(email: str, conn) -> Optional[dict]:
     row = conn.execute(

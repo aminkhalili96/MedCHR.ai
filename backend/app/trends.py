@@ -204,13 +204,20 @@ def generate_trend_chart_data(values: List[dict]) -> dict:
     """
     sorted_values = sorted(values, key=lambda x: x.get("date", ""))
     
+    # Filter to only entries with valid numeric values, keeping labels aligned
+    pairs = []
+    for v in sorted_values:
+        raw = v.get("value")
+        if raw is not None:
+            try:
+                num = float(str(raw).replace(",", ""))
+                pairs.append((v.get("date", ""), num))
+            except (ValueError, TypeError):
+                continue
+    
     return {
-        "labels": [v.get("date", "") for v in sorted_values],
-        "data": [
-            float(str(v.get("value", 0)).replace(",", "")) 
-            for v in sorted_values 
-            if v.get("value")
-        ],
+        "labels": [p[0] for p in pairs],
+        "data": [p[1] for p in pairs],
         "reference_range": {
             "min": values[0].get("reference_min") if values else None,
             "max": values[0].get("reference_max") if values else None

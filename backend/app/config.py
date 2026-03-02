@@ -1,6 +1,9 @@
+import os
 from functools import lru_cache
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+load_dotenv(override=True)
 
 class Settings(BaseSettings):
     database_url: str
@@ -10,9 +13,11 @@ class Settings(BaseSettings):
     storage_bucket: str = "medchr-uploads"
 
     openai_api_key: str | None = None
-    openai_model: str = "gpt-5.2"
-    openai_embedding_model: str = "text-embedding-3-large"
+    openai_base_url: str | None = None
+    openai_model: str = "mistral-large-latest"
+    openai_embedding_model: str = "mistral-embed"
     openai_timeout_seconds: int = 30
+    mistral_api_key: str | None = None
 
     app_secret_key: str = "dev-secret"
     app_username: str = "admin"

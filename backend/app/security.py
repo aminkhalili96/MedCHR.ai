@@ -7,13 +7,13 @@ from uuid import UUID
 import bleach
 import markdown as md
 from fastapi import HTTPException, Request, status
-from passlib.context import CryptContext
+import bcrypt
 
 from .config import get_settings
 from .db import get_conn, set_actor_context, set_tenant_context
 from .ip_whitelist import check_tenant_ip_access, extract_client_ip
 
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 _ALLOWED_TAGS = [
     "a",
@@ -114,11 +114,15 @@ def _scope_implies(scopes: set[str], required: str) -> bool:
 
 
 def hash_password(password: str) -> str:
-    return _pwd_context.hash(password)
-
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return _pwd_context.verify(password, password_hash)
+    try:
+        return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+    except Exception:
+        return False
 
 
 def _constant_time_compare(value: str, other: str) -> bool:

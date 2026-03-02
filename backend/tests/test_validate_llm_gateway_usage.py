@@ -1,10 +1,8 @@
-from pathlib import Path
-
-from backend.scripts.validate_llm_gateway_usage import find_llm_gateway_violations
+from backend.scripts.validate_llm_gateway_usage import DEFAULT_SCAN_ROOT, find_llm_gateway_violations
 
 
 def test_project_has_no_direct_openai_imports_outside_gateway():
-    violations = find_llm_gateway_violations(scan_root=Path("backend/app"))
+    violations = find_llm_gateway_violations(scan_root=DEFAULT_SCAN_ROOT)
     assert violations == []
 
 

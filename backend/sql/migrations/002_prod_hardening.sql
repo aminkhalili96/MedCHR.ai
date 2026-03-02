@@ -44,11 +44,4 @@ CREATE INDEX IF NOT EXISTS idx_jobs_status_created_at ON jobs(status, created_at
 CREATE INDEX IF NOT EXISTS idx_jobs_patient_id ON jobs(patient_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_document_id ON jobs(document_id);
 
-DO $$
-BEGIN
-  BEGIN
-    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_embeddings_vector_hnsw ON embeddings USING hnsw (embedding vector_l2_ops)';
-  EXCEPTION WHEN OTHERS THEN
-    RAISE NOTICE 'Skipping HNSW index creation; pgvector may not support it.';
-  END;
-END $$;
+-- Skipping HNSW index creation; pgvector does not support 3072 dimensions.

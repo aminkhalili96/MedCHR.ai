@@ -16,6 +16,7 @@ def build_query(structured: dict, notes: str | None = None) -> str:
 
 def retrieve_top_chunks(patient_id: str, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     embedding = embed_texts([query])[0]
+    embedding_dim = len(embedding)
     vector = Vector(embedding)
 
     with get_conn() as conn:
@@ -34,10 +35,11 @@ def retrieve_top_chunks(patient_id: str, query: str, top_k: int = 5) -> List[Dic
             FROM embeddings e
             JOIN documents d ON d.id = e.document_id
             WHERE d.patient_id = %s
-            ORDER BY e.embedding <-> %s
+              AND vector_dims(e.embedding) = %s
+            ORDER BY distance
             LIMIT %s
             """,
-            (vector, patient_id, vector, top_k),
+            (vector, patient_id, embedding_dim, top_k),
         ).fetchall()
 
     return [
@@ -153,4 +155,3 @@ def retrieve_hybrid(patient_id: str, query: str, top_k: int = 5) -> List[Dict[st
     # Fuse and return top k
     fused = reciprocal_rank_fusion(dense_results, sparse_results)
     return fused[:top_k]
-
