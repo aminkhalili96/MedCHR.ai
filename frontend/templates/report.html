@@ -1,4 +1,11 @@
 {% extends "base.html" %}
+{% block breadcrumb %}
+<a href="/ui" style="color: var(--text-muted); text-decoration: none; font-size: 13px;">Patients</a>
+<span style="color: var(--text-muted); margin: 0 6px; font-size: 13px;">/</span>
+<a href="/ui/patients/{{ patient.id }}" style="color: var(--text-muted); text-decoration: none; font-size: 13px;">{{ patient.full_name }}</a>
+<span style="color: var(--text-muted); margin: 0 6px; font-size: 13px;">/</span>
+<span class="breadcrumb-current">Report</span>
+{% endblock %}
 {% block head %}
 <style>
   /* Report Container */
@@ -421,6 +428,108 @@
   li {
     margin-bottom: 6px;
   }
+
+  /* Safety Alerts */
+  .safety-alert {
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .safety-alert-critical {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    border-left: 4px solid #dc2626;
+  }
+  .safety-alert-warning {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-left: 4px solid #f59e0b;
+  }
+  .safety-alert-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .safety-alert-content h4 {
+    margin: 0 0 4px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+  .safety-alert-content p {
+    margin: 0;
+    font-size: 13px;
+    color: #4a4a4a;
+    line-height: 1.5;
+  }
+
+  /* Confidence Badge */
+  .confidence-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .confidence-high { background: #dcfce7; color: #166534; }
+  .confidence-medium { background: #fef9c3; color: #854d0e; }
+  .confidence-low { background: #fee2e2; color: #991b1b; }
+
+  /* Vitals Grid */
+  .vitals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .vital-card {
+    background: #faf9f6;
+    border: 1px solid #e8e4df;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+  .vital-card .vital-type {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #9b9b9b;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .vital-card .vital-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1a1a1a;
+  }
+  .vital-card .vital-unit {
+    font-size: 12px;
+    color: #9b9b9b;
+  }
+  .vital-card .vital-date {
+    font-size: 11px;
+    color: #b0b0b0;
+    margin-top: 4px;
+  }
+
+  /* Allergy Chips */
+  .allergy-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin: 4px;
+  }
+  .allergy-severe { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+  .allergy-moderate { background: #fffbeb; border: 1px solid #fcd34d; color: #854d0e; }
+  .allergy-mild { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+  .allergy-default { background: #f5f3f0; border: 1px solid #e8e4df; color: #4a4a4a; }
 </style>
 {% endblock %}
 
@@ -460,11 +569,6 @@
   <div class="report-header">
     <div>
       <div class="brand">MedCHR.ai</div>
-      <div style="margin-top: 6px;">
-        <span
-          style="display: inline-flex; align-items: center; gap: 5px; background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%); color: white; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 4px; letter-spacing: 0.03em;">Powered
-          by Mistral AI</span>
-      </div>
       <div class="report-title">Client Health Report</div>
       <div class="report-subtitle">Comprehensive • Cited • Clinician-Reviewed</div>
     </div>
@@ -488,6 +592,63 @@
       {{ findings | length }} abnormal lab values were flagged.
       {% if citations %}{{ citations | length }} source citations are referenced throughout.{% endif %}
     </p>
+  </div>
+  {% endif %}
+
+  <!-- Extraction Confidence Badge -->
+  {% if overall_confidence is not none %}
+  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px;">
+    <span style="font-size: 13px; color: #6b6b6b; font-weight: 500;">Extraction Confidence:</span>
+    {% set conf_pct = (overall_confidence * 100)|round|int %}
+    {% if conf_pct >= 80 %}
+    <span class="confidence-badge confidence-high">{{ conf_pct }}% High</span>
+    {% elif conf_pct >= 50 %}
+    <span class="confidence-badge confidence-medium">{{ conf_pct }}% Medium</span>
+    {% else %}
+    <span class="confidence-badge confidence-low">{{ conf_pct }}% Low - Review Recommended</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Safety Alerts -->
+  {% set all_safety = (safety_alerts.critical_values or []) + (safety_alerts.drug_interactions or []) + (safety_alerts.allergy_alerts or []) %}
+  {% if all_safety %}
+  <div class="report-section" style="page-break-inside: avoid;">
+    <h3 style="color: #dc2626;">Clinical Safety Alerts</h3>
+    {% for alert in safety_alerts.critical_values or [] %}
+    <div class="safety-alert safety-alert-critical">
+      <div class="safety-alert-content">
+        <h4>{{ alert.direction or 'CRITICAL' }}: {{ alert.test }}</h4>
+        <p>Value: <strong>{{ alert.value }} {{ alert.unit }}</strong>
+        {% if alert.threshold_low is not none and alert.threshold_high is not none %}
+          (Critical range: &lt;{{ alert.threshold_low }} or &gt;{{ alert.threshold_high }})
+        {% elif alert.threshold_high is not none %}
+          (Critical: &gt;{{ alert.threshold_high }})
+        {% elif alert.threshold_low is not none %}
+          (Critical: &lt;{{ alert.threshold_low }})
+        {% endif %}
+        </p>
+        <p style="margin-top: 4px;"><em>Action: {{ alert.action }}</em></p>
+      </div>
+    </div>
+    {% endfor %}
+    {% for alert in safety_alerts.drug_interactions or [] %}
+    <div class="safety-alert safety-alert-warning">
+      <div class="safety-alert-content">
+        <h4>Drug Interaction: {{ alert.drug1|title }} + {{ alert.drug2|title }}</h4>
+        <p>{{ alert.effect }}</p>
+        <p style="margin-top: 4px;"><em>{{ alert.recommendation }}</em></p>
+      </div>
+    </div>
+    {% endfor %}
+    {% for alert in safety_alerts.allergy_alerts or [] %}
+    <div class="safety-alert safety-alert-critical">
+      <div class="safety-alert-content">
+        <h4>Allergy Contraindication</h4>
+        <p>{{ alert.message }}</p>
+      </div>
+    </div>
+    {% endfor %}
   </div>
   {% endif %}
 
@@ -646,14 +807,64 @@
 
 
 
+  <!-- Vital Signs -->
+  {% if vitals %}
+  <div class="report-section">
+    <h3>Vital Signs</h3>
+    <div class="vitals-grid">
+      {% for vital in vitals %}
+      <div class="vital-card">
+        <div class="vital-type">{{ vital.type }}</div>
+        <div class="vital-value">{{ vital.value }}</div>
+        <div class="vital-unit">{{ vital.unit }}</div>
+        {% if vital.recorded_at %}
+        <div class="vital-date">{{ vital.recorded_at }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Allergies -->
+  <div class="report-section">
+    <h3>Allergies</h3>
+    {% if allergies %}
+    <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+      {% for allergy in allergies %}
+      {% set sev = (allergy.severity or '')|lower %}
+      <div class="allergy-chip {% if sev == 'severe' %}allergy-severe{% elif sev == 'moderate' %}allergy-moderate{% elif sev == 'mild' %}allergy-mild{% else %}allergy-default{% endif %}">
+        <strong>{{ allergy.substance }}</strong>
+        {% if allergy.reaction %}<span style="opacity: 0.8;">- {{ allergy.reaction }}</span>{% endif %}
+        {% if allergy.severity %}<span style="font-size: 11px; opacity: 0.7;">({{ allergy.severity }})</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="report-muted">No known allergies (NKA).</p>
+    {% endif %}
+  </div>
+
   <!-- Medications & Diagnoses -->
   <div class="report-section report-grid">
     <div class="metric-card">
-      <h4>Medications / Supplements</h4>
+      <h4>Current Medications</h4>
       {% if medications %}
       <ul style="margin-top: 8px;">
         {% for med in medications %}
-        <li>{{ med }}</li>
+        <li>
+          {% if med is mapping %}
+            <strong>{{ med.name or 'Unknown' }}</strong>
+            {% if med.dosage %} {{ med.dosage }}{% endif %}
+            {% if med.frequency %} {{ med.frequency }}{% endif %}
+            {% if med.route %} ({{ med.route }}){% endif %}
+            {% if med.status and med.status != 'active' %}
+              <span style="color: #9b9b9b; font-size: 12px;"> [{{ med.status }}]</span>
+            {% endif %}
+          {% else %}
+            {{ med }}
+          {% endif %}
+        </li>
         {% endfor %}
       </ul>
       {% else %}
@@ -661,11 +872,23 @@
       {% endif %}
     </div>
     <div class="metric-card">
-      <h4>Diagnoses / Impressions</h4>
+      <h4>Diagnoses / Assessments</h4>
       {% if diagnoses %}
       <ul style="margin-top: 8px;">
         {% for dx in diagnoses %}
-        <li>{{ dx }}</li>
+        <li>
+          {% if dx is mapping %}
+            <strong>{{ dx.condition or 'Unknown' }}</strong>
+            {% if dx.code %}
+              <span style="color: #d97756; font-size: 12px; font-weight: 500;"> ({{ dx.code }})</span>
+            {% endif %}
+            {% if dx.status %}
+              <span style="color: #9b9b9b; font-size: 12px;"> - {{ dx.status }}</span>
+            {% endif %}
+          {% else %}
+            {{ dx }}
+          {% endif %}
+        </li>
         {% endfor %}
       </ul>
       {% else %}
@@ -673,6 +896,180 @@
       {% endif %}
     </div>
   </div>
+
+  <!-- Current Encounter / HPI -->
+  {% if encounters %}
+  <div class="report-section" style="page-break-inside: avoid;">
+    <h3>Current Encounter</h3>
+    {% set enc = encounters[0] %}
+    <div class="report-grid">
+      <div class="metric-card">
+        <h4>Encounter Details</h4>
+        <p><strong>Date:</strong> {{ enc.encounter_date }}</p>
+        <p><strong>Type:</strong> {{ enc.encounter_type|title }}</p>
+        {% if enc.provider_name %}
+        <p><strong>Provider:</strong> {{ enc.provider_name }}</p>
+        {% endif %}
+      </div>
+      {% if enc.chief_complaint %}
+      <div class="metric-card">
+        <h4>Chief Complaint</h4>
+        <p>{{ enc.chief_complaint }}</p>
+      </div>
+      {% endif %}
+    </div>
+    {% if enc.hpi %}
+    <div style="margin-top: 16px; padding: 16px; background: #faf9f6; border-radius: 10px; border: 1px solid #e8e4df;">
+      <h4 style="margin: 0 0 8px 0; font-size: 14px; color: #6b6b6b;">History of Present Illness (HPI)</h4>
+      <p style="margin: 0; line-height: 1.7; color: #1a1a1a;">{{ enc.hpi }}</p>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Past Medical History -->
+  {% if past_medical_history %}
+  <div class="report-section" style="page-break-inside: avoid;">
+    <h3>Past Medical History</h3>
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+      <thead>
+        <tr style="background: #faf9f6; text-align: left;">
+          <th style="padding: 10px 12px; border-bottom: 1px solid #e8e4df;">Type</th>
+          <th style="padding: 10px 12px; border-bottom: 1px solid #e8e4df;">Condition</th>
+          <th style="padding: 10px 12px; border-bottom: 1px solid #e8e4df;">Code</th>
+          <th style="padding: 10px 12px; border-bottom: 1px solid #e8e4df;">Onset</th>
+          <th style="padding: 10px 12px; border-bottom: 1px solid #e8e4df;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in past_medical_history %}
+        <tr style="border-bottom: 1px solid #f0ede8;">
+          <td style="padding: 8px 12px;">
+            <span style="background: #f0ede8; padding: 2px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase;">
+              {{ item.type or item.history_type or 'medical' }}
+            </span>
+          </td>
+          <td style="padding: 8px 12px; font-weight: 500;">{{ item.condition }}</td>
+          <td style="padding: 8px 12px; color: #d97756; font-size: 12px;">{{ item.icd_code or '-' }}</td>
+          <td style="padding: 8px 12px; color: #6b6b6b;">{{ item.onset or item.date_onset or '-' }}</td>
+          <td style="padding: 8px 12px;">
+            {% set st = (item.status or 'historical')|lower %}
+            <span style="padding: 2px 8px; border-radius: 4px; font-size: 11px;
+              {% if st == 'active' %}background: #fef2f2; color: #991b1b;
+              {% elif st == 'resolved' %}background: #dcfce7; color: #166534;
+              {% else %}background: #f5f3f0; color: #6b6b6b;{% endif %}">
+              {{ item.status or 'Historical' }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- Family History -->
+  {% if family_history %}
+  <div class="report-section" style="page-break-inside: avoid;">
+    <h3>Family History</h3>
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+      <thead>
+        <tr style="background: #faf9f6; text-align: left;">
+          <th style="padding: 10px 12px; border-bottom: 1px solid #e8e4df;">Relation</th>
+          <th style="padding: 10px 12px; border-bottom: 1px solid #e8e4df;">Condition</th>
+          <th style="padding: 10px 12px; border-bottom: 1px solid #e8e4df;">Age at Onset</th>
+          <th style="padding: 10px 12px; border-bottom: 1px solid #e8e4df;">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fh in family_history %}
+        <tr style="border-bottom: 1px solid #f0ede8;">
+          <td style="padding: 8px 12px; font-weight: 500;">{{ fh.relation|title }}</td>
+          <td style="padding: 8px 12px;">{{ fh.condition }}</td>
+          <td style="padding: 8px 12px; color: #6b6b6b;">{{ fh.age_at_onset or '-' }}</td>
+          <td style="padding: 8px 12px; color: #6b6b6b; font-size: 12px;">{{ fh.notes or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- Treatment Plan / Care Plan -->
+  {% if treatment_plans %}
+  <div class="report-section" style="page-break-inside: avoid;">
+    <h3>Treatment Plan</h3>
+    {% for plan in treatment_plans %}
+    <div style="padding: 14px 18px; margin-bottom: 10px; border-radius: 10px; border: 1px solid #e8e4df; background: #faf9f6;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <span style="font-weight: 600; font-size: 14px; color: #1a1a1a;">
+          {{ plan.description }}
+        </span>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          {% set pri = (plan.priority or 'routine')|lower %}
+          <span style="padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+            {% if pri == 'stat' %}background: #fef2f2; color: #991b1b;
+            {% elif pri == 'urgent' %}background: #fffbeb; color: #854d0e;
+            {% else %}background: #f0fdf4; color: #166534;{% endif %}">
+            {{ plan.priority or 'Routine' }}
+          </span>
+          {% set pst = (plan.status or 'pending')|lower %}
+          <span style="padding: 2px 8px; border-radius: 4px; font-size: 11px;
+            {% if pst == 'completed' %}background: #dcfce7; color: #166534;
+            {% elif pst == 'in_progress' %}background: #dbeafe; color: #1e40af;
+            {% elif pst == 'cancelled' %}background: #f5f3f0; color: #6b6b6b;
+            {% else %}background: #fef9c3; color: #854d0e;{% endif %}">
+            {{ plan.status|replace('_', ' ')|title or 'Pending' }}
+          </span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 20px; font-size: 12px; color: #6b6b6b;">
+        <span>Type: {{ plan.plan_type|replace('_', ' ')|title }}</span>
+        {% if plan.target_date %}<span>Target: {{ plan.target_date }}</span>{% endif %}
+        {% if plan.created_by %}<span>By: {{ plan.created_by }}</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Review of Systems (ROS) -->
+  {% if review_of_systems %}
+  <div class="report-section" style="page-break-inside: avoid;">
+    <h3>Review of Systems</h3>
+    <div class="report-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+      {% for ros in review_of_systems %}
+      <div class="metric-card" style="padding: 12px 16px;
+        {% if ros.is_positive %}border-left: 3px solid #f59e0b; background: #fffbeb;{% endif %}">
+        <h4 style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: {% if ros.is_positive %}#92400e{% else %}#9b9b9b{% endif %}; margin-bottom: 6px;">
+          {{ ros.system_name|replace('_', ' ')|title }}
+        </h4>
+        <p style="margin: 0; font-size: 13px; color: {% if ros.is_positive %}#1a1a1a{% else %}#6b6b6b{% endif %}; font-weight: {% if ros.is_positive %}500{% else %}400{% endif %};">
+          {{ ros.findings }}
+        </p>
+        {% if ros.notes %}
+        <p style="margin: 4px 0 0 0; font-size: 11px; color: #9b9b9b;">{{ ros.notes }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Social History / Lifestyle -->
+  {% if social_history %}
+  <div class="report-section">
+    <h3>Social History / Lifestyle</h3>
+    <div class="report-grid">
+      {% for key, value in social_history.items() %}
+      <div class="metric-card">
+        <h4>{{ key|replace('_', ' ')|title }}</h4>
+        <p>{% if value is mapping %}{{ value|tojson }}{% else %}{{ value }}{% endif %}</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 
   <!-- Source Documents -->
   <div class="report-section">
@@ -749,7 +1146,7 @@
 
   <!-- Footer -->
   <div class="report-footer">
-    MedCHR.ai &bull; Client Health Report &bull; Powered by Mistral AI &bull; Confidential
+    MedCHR.ai &bull; Client Health Report &bull; Confidential
   </div>
 </div>
 <script nonce="{{ csp_nonce }}">

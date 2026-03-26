@@ -66,11 +66,14 @@ def get_mfa_setup_secret(token_id: str, user_id: str) -> str | None:
     stored_secret = row.get("secret")
     if not stored_secret:
         return None
-    decrypted = decrypt_value(str(stored_secret))
-    if decrypted:
-        return decrypted
-    # Backward compatibility for any plaintext legacy records.
-    return str(stored_secret)
+    try:
+        decrypted = decrypt_value(str(stored_secret))
+        if decrypted:
+            return decrypted
+    except Exception:
+        # Decryption failed — do NOT fall back to plaintext for security
+        return None
+    return None
 
 
 def consume_mfa_setup_token(token_id: str, user_id: str) -> None:

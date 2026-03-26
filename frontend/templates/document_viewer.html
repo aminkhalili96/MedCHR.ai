@@ -1,4 +1,11 @@
 {% extends "base.html" %}
+{% block breadcrumb %}
+<a href="/ui" style="color: var(--text-muted); text-decoration: none; font-size: 13px;">Patients</a>
+<span style="color: var(--text-muted); margin: 0 6px; font-size: 13px;">/</span>
+<a href="/ui/patients/{{ patient.id }}" style="color: var(--text-muted); text-decoration: none; font-size: 13px;">{{ patient.full_name }}</a>
+<span style="color: var(--text-muted); margin: 0 6px; font-size: 13px;">/</span>
+<span class="breadcrumb-current">{{ document.filename }}</span>
+{% endblock %}
 {% block head %}
 <style>
     .doc-viewer-header {
@@ -142,6 +149,36 @@
         padding: 48px 24px;
         color: var(--text-muted);
         font-size: 14px;
+    }
+
+    .doc-preview-error {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 64px 24px;
+        text-align: center;
+        background: linear-gradient(135deg, #fef4f1 0%, #fff 100%);
+        border-radius: var(--radius-sm);
+        border: 1px dashed #e8c4b8;
+    }
+
+    .doc-preview-error svg {
+        margin-bottom: 16px;
+        color: #c9937f;
+    }
+
+    .doc-preview-error p {
+        margin: 0;
+        font-size: 14px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+    }
+
+    .doc-preview-error p.secondary {
+        margin-top: 6px;
+        font-size: 13px;
+        color: var(--text-muted);
     }
 
     .flag-high {
@@ -301,14 +338,26 @@
     <!-- Original Preview Panel -->
     {% if 'pdf' in document.content_type or 'image' in document.content_type %}
     <div class="doc-panel{% if not raw_text and not structured %} active{% endif %}" id="panel-preview">
-        {% if 'image' in document.content_type %}
-        <div style="text-align: center; padding: 20px;">
-            <img src="/ui/patients/{{ patient.id }}/documents/{{ document.id }}/raw" alt="{{ document.filename }}"
-                style="max-width: 100%; max-height: 700px; border-radius: var(--radius-sm); box-shadow: var(--shadow-md);" />
+        <div id="previewContent">
+            {% if 'image' in document.content_type %}
+            <div style="text-align: center; padding: 20px;">
+                <img id="previewImage" src="/ui/patients/{{ patient.id }}/documents/{{ document.id }}/raw" alt="{{ document.filename }}"
+                    style="max-width: 100%; max-height: 700px; border-radius: var(--radius-sm); box-shadow: var(--shadow-md);" />
+            </div>
+            {% elif 'pdf' in document.content_type %}
+            <iframe id="previewIframe" src="/ui/patients/{{ patient.id }}/documents/{{ document.id }}/raw" class="doc-preview-frame"></iframe>
+            {% endif %}
         </div>
-        {% elif 'pdf' in document.content_type %}
-        <iframe src="/ui/patients/{{ patient.id }}/documents/{{ document.id }}/raw" class="doc-preview-frame"></iframe>
-        {% endif %}
+        <div id="previewError" class="doc-preview-error" style="display: none;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="12" y1="12" x2="12" y2="12" />
+                <circle cx="12" cy="16" r="0.5" fill="currentColor" />
+            </svg>
+            <p>Document preview unavailable.</p>
+            <p class="secondary">The original file could not be loaded from storage.</p>
+        </div>
     </div>
     {% endif %}
 
@@ -333,5 +382,34 @@
             document.getElementById('panel-' + this.dataset.tab).classList.add('active');
         });
     });
+
+    // Show friendly error when document preview fails to load
+    function showPreviewError() {
+        var content = document.getElementById('previewContent');
+        var error = document.getElementById('previewError');
+        if (content) content.style.display = 'none';
+        if (error) error.style.display = 'flex';
+    }
+
+    var previewImg = document.getElementById('previewImage');
+    if (previewImg) {
+        previewImg.addEventListener('error', showPreviewError);
+    }
+
+    var previewIframe = document.getElementById('previewIframe');
+    if (previewIframe) {
+        previewIframe.addEventListener('error', showPreviewError);
+        // Also detect iframe load failures via HTTP error responses
+        previewIframe.addEventListener('load', function () {
+            try {
+                var doc = previewIframe.contentDocument || previewIframe.contentWindow.document;
+                if (doc && doc.title && doc.title.toLowerCase().indexOf('error') !== -1) {
+                    showPreviewError();
+                }
+            } catch (e) {
+                // Cross-origin or blocked — content may still render, so do nothing
+            }
+        });
+    }
 </script>
 {% endblock %}

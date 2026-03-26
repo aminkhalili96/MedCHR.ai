@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Dict, Any, List
 
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -6,6 +7,28 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from .config import get_settings
 from .llm_gateway import create_chat_completion, redact_if_enabled
 from .schemas import ExtractionData
+
+
+# Patterns that indicate prompt injection attempts in clinical documents
+_INJECTION_PATTERNS = [
+    re.compile(r"ignore\s+(all\s+)?previous\s+instructions", re.I),
+    re.compile(r"disregard\s+(all\s+)?prior\s+(instructions|rules)", re.I),
+    re.compile(r"you\s+are\s+now\s+(a|an)\s+", re.I),
+    re.compile(r"system\s*:\s*", re.I),
+    re.compile(r"<\s*/?\s*system\s*>", re.I),
+    re.compile(r"###\s*(instruction|system|prompt)", re.I),
+]
+
+
+def sanitize_clinical_text(text: str) -> str:
+    """
+    Remove prompt injection patterns from clinical text before sending to LLM.
+    Legitimate clinical text should never contain instruction-override phrases.
+    """
+    sanitized = text
+    for pattern in _INJECTION_PATTERNS:
+        sanitized = pattern.sub("[REDACTED]", sanitized)
+    return sanitized
 
 
 # Enhanced extraction prompt with negation detection and confidence scoring
@@ -117,7 +140,7 @@ def extract_structured(text: str, enrich: bool = True) -> Dict[str, Any]:
 
     # Smart chunking for long documents
     max_chars = 60000  # ~15k tokens for GPT-4
-    safe_text = redact_if_enabled(text[:max_chars])
+    safe_text = sanitize_clinical_text(redact_if_enabled(text[:max_chars]))
 
     try:
         response = create_chat_completion(

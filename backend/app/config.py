@@ -104,6 +104,22 @@ class Settings(BaseSettings):
     )
 
 
+def validate_production_config(s: Settings) -> None:
+    """Raise if production/HIPAA settings are insecure."""
+    errors = []
+    if s.app_secret_key == "dev-secret":
+        errors.append("APP_SECRET_KEY must be changed from the default 'dev-secret'")
+    if not s.csrf_enabled:
+        errors.append("CSRF_ENABLED must be true in production/HIPAA mode")
+    if errors:
+        raise RuntimeError(
+            "Insecure configuration for production/HIPAA mode:\n  - " + "\n  - ".join(errors)
+        )
+
+
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    s = Settings()
+    if s.app_env == "prod" or s.hipaa_mode:
+        validate_production_config(s)
+    return s

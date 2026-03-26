@@ -25,18 +25,36 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Content Security Policy
         csp_nonce = secrets.token_urlsafe(16)
         request.state.csp_nonce = csp_nonce
-        csp = (
-            "default-src 'self'; "
-            "img-src 'self' data:; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "font-src 'self' https://fonts.gstatic.com; "
-            f"script-src 'self' 'nonce-{csp_nonce}' https://cdn.jsdelivr.net; "
-            "connect-src 'self'; "
-            "object-src 'none'; "
-            "frame-ancestors 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self'"
-        )
+
+        # Swagger/ReDoc use inline scripts and CDN CSS — relax CSP for docs paths.
+        _docs_paths = ("/docs", "/redoc", "/openapi.json")
+        if request.url.path in _docs_paths:
+            csp = (
+                "default-src 'self'; "
+                "img-src 'self' data: https://fastapi.tiangolo.com; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; "
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "connect-src 'self'; "
+                "object-src 'none'; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'"
+            )
+        else:
+            csp = (
+                "default-src 'self'; "
+                "img-src 'self' data:; "
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                "font-src 'self' https://fonts.gstatic.com; "
+                f"script-src 'self' 'nonce-{csp_nonce}' https://cdn.jsdelivr.net; "
+                "connect-src 'self'; "
+                "object-src 'none'; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'"
+            )
+
         response.headers["Content-Security-Policy"] = csp
         
         return response

@@ -1,4 +1,9 @@
 {% extends "base.html" %}
+{% block breadcrumb %}
+<a href="/ui" style="color: var(--text-muted); text-decoration: none; font-size: 13px;">Patients</a>
+<span style="color: var(--text-muted); margin: 0 6px; font-size: 13px;">/</span>
+<span class="breadcrumb-current">{{ patient.full_name }}</span>
+{% endblock %}
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
@@ -434,6 +439,116 @@
   .records-panel.active {
     display: block;
   }
+
+  /* ─── Collapsible sections ─── */
+  .collapsible-section {
+    border: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .collapsible-section summary {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    gap: 8px;
+  }
+
+  .collapsible-section summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .collapsible-section summary::marker {
+    display: none;
+    content: '';
+  }
+
+  .collapsible-section .chevron-icon {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.2s ease;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .collapsible-section[open] .chevron-icon {
+    transform: rotate(90deg);
+  }
+
+  .collapsible-section .section-body {
+    padding-top: 16px;
+  }
+
+  .collapsible-section summary .section-header {
+    flex: 1;
+    margin-bottom: 0;
+  }
+
+  /* ─── Worsening chart indicator ─── */
+  .chart-box-worsening {
+    border-left: 3px solid #DC2626;
+    background: linear-gradient(90deg, rgba(220, 38, 38, 0.03) 0%, var(--bg-secondary) 40%);
+  }
+
+  .chart-box-improving {
+    border-left: 3px solid #16a34a;
+  }
+
+  /* ─── Activity log truncation ─── */
+  .activity-row-hidden {
+    display: none;
+  }
+
+  .show-all-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--accent-primary);
+    cursor: pointer;
+    background: none;
+    border: 1px solid var(--border-light);
+    font-family: inherit;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    margin-top: 8px;
+    transition: background 0.15s;
+  }
+
+  .show-all-toggle:hover {
+    background: var(--accent-light);
+  }
+
+  /* ─── Alert count badge ─── */
+  .alert-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #DC2626;
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+
+  .no-alerts-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #16a34a;
+    font-size: 11px;
+    font-weight: 500;
+    margin-left: 8px;
+  }
 </style>
 {% endblock %}
 
@@ -471,9 +586,7 @@
       <span>{{ patient.notes[:80] }}{% if patient.notes|length > 80 %}...{% endif %}</span>
       {% endif %}
       <span>{{ documents | length }} document{{ 's' if documents | length != 1 else '' }}</span>
-      <span
-        style="display: inline-flex; align-items: center; gap: 4px; background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%); color: white; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 3px; letter-spacing: 0.03em;">Powered
-        by Mistral AI</span>
+
       {% if patient.dob %}
       <span style="color: var(--text-muted); font-size: 12px;">
         {% set dob_str = patient.dob | string %}
@@ -487,8 +600,7 @@
   </div>
   <div style="display: flex; gap: 8px; align-items: center;">
     {% if documents %}
-    <form method="post" action="/ui/patients/{{ patient.id }}/draft" style="margin: 0;"
-      onsubmit="document.getElementById('chrProgress').classList.add('active');">
+    <form id="chrDraftForm" method="post" action="/ui/patients/{{ patient.id }}/draft" style="margin: 0;">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <button type="submit" class="btn-secondary"
         style="font-size: 13px; padding: 8px 16px; border: 1px solid var(--border-light); background: white; cursor: pointer; border-radius: var(--radius-sm); color: var(--text-primary);">
@@ -504,40 +616,59 @@
 </div>
 
 <!-- Clinical Safety Alerts -->
-{% if safety_alerts is defined and safety_alerts %}
-<div id="safety-alerts" style="margin-top: 16px;">
-  {% for alert in safety_alerts %}
-  <div
-    style="padding: 12px 16px; background: {% if alert.severity == 'CRITICAL' %}#FEF2F2{% else %}#FFFBEB{% endif %}; border: 1px solid {% if alert.severity == 'CRITICAL' %}#FECACA{% else %}#FDE68A{% endif %}; border-left: 4px solid {% if alert.severity == 'CRITICAL' %}#DC2626{% else %}#D97706{% endif %}; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 12px; font-size: 13px;">
-    <span
-      style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: {% if alert.severity == 'CRITICAL' %}#DC2626{% else %}#D97706{% endif %}; color: white; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px;">!</span>
-    <div style="flex: 1;">
-      {% if alert.test is defined %}
-      <div style="font-weight: 600; color: {% if alert.severity == 'CRITICAL' %}#991B1B{% else %}#92400E{% endif %};">
-        {{ alert.direction }}: {{ alert.test }} = {{ alert.value }} {{ alert.unit }}
-      </div>
-      {% if alert.action %}
-      <div style="color: {% if alert.severity == 'CRITICAL' %}#B91C1C{% else %}#B45309{% endif %}; margin-top: 2px;">{{
-        alert.action }}</div>
-      {% endif %}
-      {% elif alert.drug1 is defined %}
-      <div style="font-weight: 600; color: {% if alert.severity == 'CRITICAL' %}#991B1B{% else %}#92400E{% endif %};">
-        Drug Interaction: {{ alert.drug1 | title }} + {{ alert.drug2 | title }}
-      </div>
-      <div style="color: {% if alert.severity == 'CRITICAL' %}#B91C1C{% else %}#B45309{% endif %}; margin-top: 2px;">{{
-        alert.effect }} — {{ alert.recommendation }}</div>
-      {% elif alert.allergen is defined or alert.allergy is defined %}
-      <div style="font-weight: 600; color: #991B1B;">
-        Allergy Alert: {{ alert.medication | title }} contraindicated (allergy to {{ alert.allergen or alert.allergy }})
-      </div>
-      {% else %}
-      <div style="font-weight: 600; color: #92400E;">{{ alert }}</div>
-      {% endif %}
+<hr class="section-divider">
+<details class="collapsible-section" {% if safety_alerts is defined and safety_alerts %}open{% endif %}>
+  <summary>
+    <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    <div class="section-header">
+      <h2 class="section-title">Clinical Alerts
+        {% if safety_alerts is defined and safety_alerts %}
+        <span class="alert-count-badge">{{ safety_alerts | length }}</span>
+        {% else %}
+        <span class="no-alerts-badge">No alerts</span>
+        {% endif %}
+      </h2>
     </div>
+  </summary>
+  <div class="section-body">
+    {% if safety_alerts is defined and safety_alerts %}
+    <div id="safety-alerts">
+      {% for alert in safety_alerts %}
+      <div
+        style="padding: 12px 16px; background: {% if alert.severity == 'CRITICAL' %}#FEF2F2{% else %}#FFFBEB{% endif %}; border: 1px solid {% if alert.severity == 'CRITICAL' %}#FECACA{% else %}#FDE68A{% endif %}; border-left: 4px solid {% if alert.severity == 'CRITICAL' %}#DC2626{% else %}#D97706{% endif %}; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 12px; font-size: 13px;">
+        <span
+          style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: {% if alert.severity == 'CRITICAL' %}#DC2626{% else %}#D97706{% endif %}; color: white; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 1px;">!</span>
+        <div style="flex: 1;">
+          {% if alert.test is defined %}
+          <div style="font-weight: 600; color: {% if alert.severity == 'CRITICAL' %}#991B1B{% else %}#92400E{% endif %};">
+            {{ alert.direction }}: {{ alert.test }} = {{ alert.value }} {{ alert.unit }}
+          </div>
+          {% if alert.action %}
+          <div style="color: {% if alert.severity == 'CRITICAL' %}#B91C1C{% else %}#B45309{% endif %}; margin-top: 2px;">{{
+            alert.action }}</div>
+          {% endif %}
+          {% elif alert.drug1 is defined %}
+          <div style="font-weight: 600; color: {% if alert.severity == 'CRITICAL' %}#991B1B{% else %}#92400E{% endif %};">
+            Drug Interaction: {{ alert.drug1 | title }} + {{ alert.drug2 | title }}
+          </div>
+          <div style="color: {% if alert.severity == 'CRITICAL' %}#B91C1C{% else %}#B45309{% endif %}; margin-top: 2px;">{{
+            alert.effect }} — {{ alert.recommendation }}</div>
+          {% elif alert.allergen is defined or alert.allergy is defined %}
+          <div style="font-weight: 600; color: #991B1B;">
+            Allergy Alert: {{ alert.medication | title }} contraindicated (allergy to {{ alert.allergen or alert.allergy }})
+          </div>
+          {% else %}
+          <div style="font-weight: 600; color: #92400E;">{{ alert }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="section-empty">No clinical alerts detected. All values within expected ranges.</p>
+    {% endif %}
   </div>
-  {% endfor %}
-</div>
-{% endif %}
+</details>
 
 {% if pending_jobs %}
 <div
@@ -558,98 +689,115 @@
 <!-- ═══════════════════ RAW PATIENT DATA (DOCUMENTS) ═══════════════════ -->
 <hr class="section-divider" id="raw-data">
 
-<div class="section-header">
-  <h2 class="section-title">Raw Patient Data</h2>
-  <button type="button" class="section-action" onclick="document.getElementById('fileInput').click()">+ Upload</button>
-</div>
-<p style="font-size: 13px; color: var(--text-muted); margin: 0 0 12px 0;">
-  Open any file to show original source content, extracted raw text, and structured parsing side-by-side.
-</p>
+<details class="collapsible-section" open>
+  <summary>
+    <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    <div class="section-header">
+      <h2 class="section-title">Raw Patient Data</h2>
+      <span class="section-action" id="uploadTrigger">+ Upload</span>
+    </div>
+  </summary>
+  <div class="section-body">
+    <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 12px 0;">
+      Open any file to show original source content, extracted raw text, and structured parsing side-by-side.
+    </p>
 
-<form id="uploadForm" method="post" action="/ui/patients/{{ patient.id }}/upload" enctype="multipart/form-data">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-  <input type="file" id="fileInput" name="files" multiple required style="display: none;"
-    onchange="document.getElementById('fileCount').textContent = this.files.length + ' file(s) selected'; document.getElementById('uploadBtn').style.display = 'inline-flex';" />
-  <div class="upload-inline" id="uploadArea" style="display: none;">
-    <span class="file-count" id="fileCount"></span>
-    <button type="submit" id="uploadBtn" class="btn-primary"
-      style="font-size: 13px; padding: 6px 14px;">Process</button>
+    <form id="uploadForm" method="post" action="/ui/patients/{{ patient.id }}/upload" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <input type="file" id="fileInput" name="files" multiple required style="display: none;" />
+      <div class="upload-inline" id="uploadArea" style="display: none;">
+        <span class="file-count" id="fileCount"></span>
+        <button type="submit" id="uploadBtn" class="btn-primary"
+          style="font-size: 13px; padding: 6px 14px;">Process</button>
+      </div>
+    </form>
+
+    {% if documents %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for doc in documents %}
+        <tr>
+          <td style="font-weight: 500;">{{ doc.filename }}</td>
+          <td>{% if doc.content_type and 'pdf' in doc.content_type %}PDF{% elif doc.content_type and 'image' in
+            doc.content_type %}Image{% elif doc.content_type and 'text/plain' in
+            doc.content_type %}Clinical Note{% elif doc.content_type and 'text' in doc.content_type %}Text Document{% else
+            %}{{ doc.content_type or 'Unknown'
+            }}{% endif %}</td>
+          <td><span style="color: #16a34a; font-weight: 500;">Processed</span></td>
+          <td>
+            <a href="/ui/patients/{{ patient.id }}/documents/{{ doc.id }}/view"
+              style="color: var(--accent-primary); font-size: 13px; text-decoration: none; font-weight: 500;">Inspect</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="section-empty">No documents uploaded yet. Use "+ Upload" to add lab reports, clinical notes, or imaging
+      summaries.</p>
+    {% endif %}
   </div>
-</form>
-
-{% if documents %}
-<table class="data-table">
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th>Type</th>
-      <th>Status</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for doc in documents %}
-    <tr>
-      <td style="font-weight: 500;">{{ doc.filename }}</td>
-      <td>{% if doc.content_type and 'pdf' in doc.content_type %}PDF{% elif doc.content_type and 'image' in
-        doc.content_type %}Image{% elif doc.content_type and 'text/plain' in
-        doc.content_type %}Clinical Note{% elif doc.content_type and 'text' in doc.content_type %}Text Document{% else
-        %}{{ doc.content_type or 'Unknown'
-        }}{% endif %}</td>
-      <td><span style="color: #16a34a; font-weight: 500;">Processed</span></td>
-      <td>
-        <a href="/ui/patients/{{ patient.id }}/documents/{{ doc.id }}/view"
-          style="color: var(--accent-primary); font-size: 13px; text-decoration: none; font-weight: 500;">Inspect</a>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<p class="section-empty">No documents uploaded yet. Use "+ Upload" to add lab reports, clinical notes, or imaging
-  summaries.</p>
-{% endif %}
+</details>
 
 <!-- ═══════════════════ VISUALIZATIONS ═══════════════════ -->
 <hr class="section-divider" id="visualizations">
 
-<div class="section-header">
-  <h2 class="section-title">Trend Visualizations</h2>
-</div>
-
-{% if trend_summary %}
-<div class="trend-summary">
-  {% if trend_summary.improving %}<div class="trend-item"><span class="trend-dot trend-dot-improving"></span> {{
-    trend_summary.improving }} improving</div>{% endif %}
-  {% if trend_summary.stable %}<div class="trend-item"><span class="trend-dot trend-dot-stable"></span> {{
-    trend_summary.stable }} stable</div>{% endif %}
-  {% if trend_summary.worsening %}<div class="trend-item"><span class="trend-dot trend-dot-worsening"></span> {{
-    trend_summary.worsening }} worsening</div>{% endif %}
-</div>
-{% endif %}
-
-{% if chart_data %}
-<div class="charts-grid" id="chartsContainer">
-  {% for test_name, data in chart_data.items() %}
-  <div class="chart-box">
-    <h4>{{ test_name }}</h4>
-    <div style="position: relative; height: 200px;">
-      <canvas id="chart-{{ loop.index }}"></canvas>
+<details class="collapsible-section" open>
+  <summary>
+    <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    <div class="section-header">
+      <h2 class="section-title">Trend Visualizations</h2>
     </div>
+  </summary>
+  <div class="section-body">
+    {% if trend_summary %}
+    <div class="trend-summary">
+      {% if trend_summary.improving %}<div class="trend-item"><span class="trend-dot trend-dot-improving"></span> {{
+        trend_summary.improving }} improving</div>{% endif %}
+      {% if trend_summary.stable %}<div class="trend-item"><span class="trend-dot trend-dot-stable"></span> {{
+        trend_summary.stable }} stable</div>{% endif %}
+      {% if trend_summary.worsening %}<div class="trend-item"><span class="trend-dot trend-dot-worsening"></span> {{
+        trend_summary.worsening }} worsening</div>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if chart_data %}
+    <div class="charts-grid" id="chartsContainer">
+      {% for test_name, data in chart_data.items() %}
+      <div class="chart-box" id="chart-box-{{ loop.index }}">
+        <h4>{{ test_name }}</h4>
+        <div style="position: relative; height: 200px;">
+          <canvas id="chart-{{ loop.index }}"></canvas>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="section-empty">Not enough longitudinal data for trend charts. At least 2 readings of the same test are needed.
+    </p>
+    {% endif %}
   </div>
-  {% endfor %}
-</div>
-{% else %}
-<p class="section-empty">Not enough longitudinal data for trend charts. At least 2 readings of the same test are needed.
-</p>
-{% endif %}
+</details>
 
 <!-- ═══════════════════ RECORDS ═══════════════════ -->
 <hr class="section-divider" id="records">
 
-<div class="section-header">
-  <h2 class="section-title">Patient Records</h2>
-</div>
+<details class="collapsible-section" open>
+  <summary>
+    <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    <div class="section-header">
+      <h2 class="section-title">Patient Records</h2>
+    </div>
+  </summary>
+  <div class="section-body">
 
 <div class="records-tabs" id="recordsTabs">
   <button class="records-tab active" data-tab="labs">Lab Results{% if lab_results %} <span
@@ -662,7 +810,7 @@
       vitals | length }})</span>{% endif %}</button>
   <button class="records-tab" data-tab="allergies">Allergies{% if allergies %} <span
       style="opacity: 0.5; font-weight: 400;">({{ allergies | length }})</span>{% endif %}</button>
-  <button class="records-tab" onclick="document.getElementById('raw-data').scrollIntoView({behavior: 'smooth'})">Raw
+  <button class="records-tab" id="rawDataTabBtn">Raw
     Data{% if documents %} <span style="opacity: 0.5; font-weight: 400;">({{ documents | length }})</span>{% endif
     %}</button>
 </div>
@@ -674,7 +822,7 @@
     <label
       style="display: flex; align-items: center; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin: 0;">
       <input type="checkbox" id="showAbnormalLabs" checked
-        style="width: 16px; height: 16px; margin-right: 8px; cursor: pointer;" onchange="toggleLabVisibility()"> Show
+        style="width: 16px; height: 16px; margin-right: 8px; cursor: pointer;"> Show
       Abnormal Only
     </label>
   </div>
@@ -835,15 +983,21 @@
   {% endif %}
 </div>
 
+  </div>
+</details>
 
 <!-- ═══════════════════ LIFESTYLE ═══════════════════ -->
 <hr class="section-divider">
 
-<div class="section-header">
-  <h2 class="section-title">Lifestyle</h2>
-  <button type="button" class="section-action"
-    onclick="document.getElementById('lifestyleForm').classList.toggle('visible'); this.textContent = this.textContent === 'Edit' ? 'Cancel' : 'Edit';">Edit</button>
-</div>
+<details class="collapsible-section">
+  <summary>
+    <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    <div class="section-header">
+      <h2 class="section-title">Lifestyle</h2>
+      <span class="section-action" id="lifestyleEditBtn">Edit</span>
+    </div>
+  </summary>
+  <div class="section-body">
 
 <div class="kv-grid">
   <div class="kv-item">
@@ -955,6 +1109,9 @@
   <button type="submit" class="btn-primary" style="margin-top: 12px; font-size: 13px; padding: 8px 16px;">Save</button>
 </form>
 
+  </div>
+</details>
+
 <!-- ═══════════════════ COMPREHENSIVE HEALTH REPORT ═══════════════════ -->
 <hr class="section-divider">
 
@@ -1017,12 +1174,17 @@
 <!-- ═══════════════════ ACTIVITY LOG ═══════════════════ -->
 <hr class="section-divider" id="activity">
 
-<div class="section-header">
-  <h2 class="section-title">Activity</h2>
-</div>
+<details class="collapsible-section">
+  <summary>
+    <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    <div class="section-header">
+      <h2 class="section-title">Activity{% if logs %} <span style="opacity: 0.5; font-weight: 400; font-size: 14px;">({{ logs | length }})</span>{% endif %}</h2>
+    </div>
+  </summary>
+  <div class="section-body">
 
 {% if logs %}
-<table class="data-table">
+<table class="data-table" id="activityTable">
   <thead>
     <tr>
       <th>Time</th>
@@ -1033,7 +1195,7 @@
   </thead>
   <tbody>
     {% for log in logs %}
-    <tr>
+    <tr class="activity-log-row{% if loop.index > 5 %} activity-row-hidden{% endif %}">
       <td style="color: var(--text-muted); white-space: nowrap;">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if
         log.created_at else log.created_at }}</td>
       <td>{{ log.actor }}</td>
@@ -1048,7 +1210,8 @@
               stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7;">
               <circle cx="12" cy="12" r="10"></circle>
               <line x1="2" y1="12" x2="22" y2="12"></line>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z">
+              </path>
             </svg>
             {{ log.details.get('ip') }}
           </span>
@@ -1079,9 +1242,17 @@
     {% endfor %}
   </tbody>
 </table>
+{% if logs | length > 5 %}
+<button type="button" class="show-all-toggle" id="showAllActivity">
+  Show all {{ logs | length }} entries
+</button>
+{% endif %}
 {% else %}
 <p class="section-empty">No activity logged yet.</p>
 {% endif %}
+
+  </div>
+</details>
 
 <script nonce="{{ csp_nonce }}">
   // Records tab switching
@@ -1090,13 +1261,50 @@
       document.querySelectorAll('.records-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.records-panel').forEach(p => p.classList.remove('active'));
       this.classList.add('active');
-      document.getElementById('panel-' + this.dataset.tab).classList.add('active');
+      const panelId = this.dataset.tab;
+      if (panelId) {
+        document.getElementById('panel-' + panelId).classList.add('active');
+      }
     });
   });
+
+  // Upload trigger (moved from inline onclick)
+  (function() {
+    var uploadTrigger = document.getElementById('uploadTrigger');
+    if (uploadTrigger) {
+      uploadTrigger.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        document.getElementById('fileInput').click();
+      });
+    }
+  })();
+
+  // CHR draft form overlay (moved from inline onsubmit)
+  (function() {
+    var chrDraftForm = document.getElementById('chrDraftForm');
+    if (chrDraftForm) {
+      chrDraftForm.addEventListener('submit', function () {
+        document.getElementById('chrProgress').classList.add('active');
+      });
+    }
+  })();
+
+  // Raw Data tab button (moved from inline onclick)
+  (function() {
+    var rawDataBtn = document.getElementById('rawDataTabBtn');
+    if (rawDataBtn) {
+      rawDataBtn.addEventListener('click', function () {
+        document.getElementById('raw-data').scrollIntoView({behavior: 'smooth'});
+      });
+    }
+  })();
 
   // Show upload area when files selected
   document.getElementById('fileInput').addEventListener('change', function () {
     if (this.files.length > 0) {
+      document.getElementById('fileCount').textContent = this.files.length + ' file(s) selected';
+      document.getElementById('uploadBtn').style.display = 'inline-flex';
       document.getElementById('uploadArea').style.display = 'flex';
     }
   });
@@ -1104,64 +1312,187 @@
   // Processing overlays
   document.getElementById('uploadForm').addEventListener('submit', function () {
     document.getElementById('uploadProgress').classList.add('active');
-    const steps = ['Uploading files...', 'Extracting text...', 'Running OCR...', 'Generating embeddings...', 'Indexing...'];
-    let i = 0;
-    setInterval(() => {
+    var steps = ['Uploading files...', 'Extracting text...', 'Running OCR...', 'Generating embeddings...', 'Indexing...'];
+    var i = 0;
+    setInterval(function() {
       if (i < steps.length) document.getElementById('uploadStep').textContent = steps[i++];
     }, 900);
   });
 
-  // Chart.js — render trend charts
-  {% if chart_data %}
-  const chartData = {{ chart_data | tojson }};
-  let chartIdx = 1;
-  for (const [testName, data] of Object.entries(chartData)) {
-    const canvas = document.getElementById('chart-' + chartIdx);
-    if (canvas && data.data && data.data.length >= 2) {
-      const ctx = canvas.getContext('2d');
+  // Lifestyle edit toggle (moved from inline onclick)
+  (function() {
+    var editBtn = document.getElementById('lifestyleEditBtn');
+    if (editBtn) {
+      editBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var form = document.getElementById('lifestyleForm');
+        form.classList.toggle('visible');
+        this.textContent = this.textContent.trim() === 'Edit' ? 'Cancel' : 'Edit';
+      });
+    }
+  })();
 
-      // Format labels
-      const labels = data.labels.map(d => {
+  // Activity log: show all toggle
+  (function() {
+    var showAllBtn = document.getElementById('showAllActivity');
+    if (showAllBtn) {
+      showAllBtn.addEventListener('click', function () {
+        var hiddenRows = document.querySelectorAll('.activity-log-row.activity-row-hidden');
+        hiddenRows.forEach(function(row) { row.classList.remove('activity-row-hidden'); });
+        this.style.display = 'none';
+      });
+    }
+  })();
+
+  // Lab Results Toggle Logic (moved from inline onchange)
+  function toggleLabVisibility() {
+    var showAbnormalOnly = document.getElementById('showAbnormalLabs').checked;
+    var labRows = document.querySelectorAll('#labsTable tbody tr.lab-row');
+    labRows.forEach(function(row) {
+      if (showAbnormalOnly && row.classList.contains('lab-normal')) {
+        row.style.display = 'none';
+      } else {
+        row.style.display = '';
+      }
+    });
+  }
+
+  (function() {
+    var checkbox = document.getElementById('showAbnormalLabs');
+    if (checkbox) {
+      checkbox.addEventListener('change', toggleLabVisibility);
+    }
+  })();
+
+  // ──────────── Chart.js — Improved Trend Charts ────────────
+  {% if chart_data %}
+  var chartData = {{ chart_data | tojson }};
+
+  // Helper: determine if a value is within the reference range
+  function getPointColor(value, refMin, refMax) {
+    if (refMin == null && refMax == null) return null; // no ref range, use default
+    if (refMin != null && value < parseFloat(refMin)) return '#DC2626'; // below range — red
+    if (refMax != null && value > parseFloat(refMax)) return '#DC2626'; // above range — red
+    return '#16a34a'; // within range — green
+  }
+
+  // Helper: determine trend direction from data points
+  function getTrendDirection(values) {
+    if (!values || values.length < 2) return 'stable';
+    var first = values[0];
+    var last = values[values.length - 1];
+    if (first === 0) return 'stable';
+    var pctChange = ((last - first) / Math.abs(first)) * 100;
+    if (Math.abs(pctChange) < 5) return 'stable';
+    // For simplicity, assume higher = worsening for most lab values
+    return pctChange > 15 ? 'worsening' : (pctChange < -15 ? 'improving' : 'stable');
+  }
+
+  var chartIdx = 1;
+  for (var testNameKey in chartData) {
+    if (!chartData.hasOwnProperty(testNameKey)) continue;
+    var data = chartData[testNameKey];
+    var canvas = document.getElementById('chart-' + chartIdx);
+    var chartBox = document.getElementById('chart-box-' + chartIdx);
+
+    if (canvas && data.data && data.data.length >= 2) {
+      var ctx = canvas.getContext('2d');
+
+      // Format labels — abbreviated dates
+      var labels = data.labels.map(function(d) {
         if (!d) return '';
-        const date = new Date(d);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+        var date = new Date(d);
+        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return months[date.getMonth()] + ' ' + String(date.getFullYear()).slice(-2);
       });
 
-      let datasets = [{
+      // Determine per-point colors based on reference range
+      var refMin = (data.reference_range && data.reference_range.min != null) ? data.reference_range.min : null;
+      var refMax = (data.reference_range && data.reference_range.max != null) ? data.reference_range.max : null;
+
+      var pointColors = data.data.map(function(val) {
+        var c = getPointColor(val, refMin, refMax);
+        return c || '#8B7355'; // default warm brown if no ref range
+      });
+
+      var pointBorderColors = data.data.map(function(val) {
+        var c = getPointColor(val, refMin, refMax);
+        return c || '#8B7355';
+      });
+
+      // Determine trend direction and apply visual indicator to chart card
+      var direction = getTrendDirection(data.data);
+      if (chartBox) {
+        if (direction === 'worsening') {
+          chartBox.classList.add('chart-box-worsening');
+        } else if (direction === 'improving') {
+          chartBox.classList.add('chart-box-improving');
+        }
+      }
+
+      var datasets = [{
         label: 'Value',
         data: data.data,
         borderColor: '#8B7355',
-        backgroundColor: 'rgba(139, 115, 85, 0.1)',
+        backgroundColor: 'rgba(139, 115, 85, 0.05)',
         borderWidth: 2,
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        pointBackgroundColor: '#8B7355',
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointBorderColors,
+        pointBorderWidth: 2,
         tension: 0.3,
         fill: true
       }];
 
-      // Add reference range if available
-      if (data.reference_range && data.reference_range.min != null) {
+      // Add reference range as a shaded green band (if both min and max are available)
+      if (refMin != null && refMax != null) {
         datasets.push({
-          label: 'Ref Min',
-          data: Array(data.data.length).fill(parseFloat(data.reference_range.min)),
-          borderColor: 'rgba(180, 83, 9, 0.3)',
+          label: 'Normal Range (upper)',
+          data: Array(data.data.length).fill(parseFloat(refMax)),
+          borderColor: 'rgba(22, 163, 74, 0.25)',
           borderWidth: 1,
-          borderDash: [4, 4],
+          borderDash: [3, 3],
           pointRadius: 0,
+          pointHitRadius: 0,
+          fill: '+1',
+          backgroundColor: 'rgba(22, 163, 74, 0.08)'
+        });
+        datasets.push({
+          label: 'Normal Range (lower)',
+          data: Array(data.data.length).fill(parseFloat(refMin)),
+          borderColor: 'rgba(22, 163, 74, 0.25)',
+          borderWidth: 1,
+          borderDash: [3, 3],
+          pointRadius: 0,
+          pointHitRadius: 0,
           fill: false
         });
-      }
-      if (data.reference_range && data.reference_range.max != null) {
-        datasets.push({
-          label: 'Ref Max',
-          data: Array(data.data.length).fill(parseFloat(data.reference_range.max)),
-          borderColor: 'rgba(185, 28, 28, 0.3)',
-          borderWidth: 1,
-          borderDash: [4, 4],
-          pointRadius: 0,
-          fill: false
-        });
+      } else {
+        // Only one boundary available — show as dashed line
+        if (refMin != null) {
+          datasets.push({
+            label: 'Ref Min',
+            data: Array(data.data.length).fill(parseFloat(refMin)),
+            borderColor: 'rgba(22, 163, 74, 0.4)',
+            borderWidth: 1,
+            borderDash: [4, 4],
+            pointRadius: 0,
+            fill: false
+          });
+        }
+        if (refMax != null) {
+          datasets.push({
+            label: 'Ref Max',
+            data: Array(data.data.length).fill(parseFloat(refMax)),
+            borderColor: 'rgba(185, 28, 28, 0.4)',
+            borderWidth: 1,
+            borderDash: [4, 4],
+            pointRadius: 0,
+            fill: false
+          });
+        }
       }
 
       new Chart(ctx, {
@@ -1184,13 +1515,33 @@
               cornerRadius: 6,
               displayColors: true,
               borderColor: 'rgba(255,255,255,0.1)',
-              borderWidth: 1
+              borderWidth: 1,
+              filter: function(tooltipItem) {
+                // Hide reference range lines from tooltip
+                return tooltipItem.datasetIndex === 0;
+              },
+              callbacks: {
+                afterBody: function(tooltipItems) {
+                  if (refMin != null || refMax != null) {
+                    var parts = [];
+                    if (refMin != null) parts.push(refMin);
+                    if (refMax != null) parts.push(refMax);
+                    return ['Ref range: ' + parts.join(' - ')];
+                  }
+                  return [];
+                }
+              }
             }
           },
           scales: {
             x: {
               grid: { display: false },
-              ticks: { font: { size: 11 }, color: '#999' }
+              ticks: {
+                font: { size: 11 },
+                color: '#999',
+                maxRotation: 45,
+                minRotation: 45
+              }
             },
             y: {
               grid: { color: 'rgba(0,0,0,0.04)' },
@@ -1204,22 +1555,8 @@
   }
   {% endif %}
 
-  // Lab Results Toggle Logic
-  function toggleLabVisibility() {
-    const showAbnormalOnly = document.getElementById('showAbnormalLabs').checked;
-    const labRows = document.querySelectorAll('#labsTable tbody tr.lab-row');
-
-    labRows.forEach(row => {
-      if (showAbnormalOnly && row.classList.contains('lab-normal')) {
-        row.style.display = 'none';
-      } else {
-        row.style.display = '';
-      }
-    });
-  }
-
   // Initialize on load
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('showAbnormalLabs')) {
       toggleLabVisibility();
     }

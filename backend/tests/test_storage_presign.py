@@ -1,7 +1,7 @@
 import pytest
 from fastapi import HTTPException
 
-from backend.app.main import _validate_storage_path_for_patient
+from backend.app.helpers import _validate_storage_path_for_patient
 
 
 def test_validate_storage_path_for_patient_allows_patient_prefix():

@@ -8,6 +8,18 @@ Provides:
 - Allergy-drug contraindication checks
 
 Gap References: C01-C10
+
+DISCLAIMER: Reference ranges are general adult values derived from common
+clinical laboratory references (Tietz Clinical Guide to Laboratory Tests,
+4th Edition; CLSI guidelines). These ranges do NOT account for age, sex,
+pregnancy, ethnicity, or assay-specific variations. Always verify against
+your laboratory's own published reference ranges before making clinical
+decisions. This module is a decision-support tool — NOT a substitute for
+clinical judgement.
+
+Drug interactions listed here are an illustrative subset, NOT a comprehensive
+database. Use authoritative drug interaction databases (e.g., Lexicomp,
+Micromedex, Clinical Pharmacology) for production clinical decisions.
 """
 
 from typing import Optional
@@ -16,6 +28,7 @@ from datetime import datetime, timedelta
 
 # ============================================================================
 # Critical Lab Value Ranges
+# Source: General adult ranges — see module docstring for limitations
 # ============================================================================
 
 # Values outside these ranges require immediate clinical attention
@@ -324,7 +337,9 @@ def check_abnormal_trend(current_labs: list[dict], historical_labs: list[dict],
 # Drug Interaction Checking
 # ============================================================================
 
-# High-risk drug interactions (simplified for MVP)
+# High-risk drug interactions — ILLUSTRATIVE SUBSET ONLY.
+# NOT a comprehensive database. ~15 interactions listed; production systems
+# should integrate a full drug interaction API (e.g., RxNorm, Lexicomp).
 DRUG_INTERACTIONS = {
     ("warfarin", "aspirin"): {
         "severity": "HIGH",

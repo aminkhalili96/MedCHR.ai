@@ -30,3 +30,4 @@ structlog==25.5.0
 supabase==2.27.1
 tenacity==8.5.0
 uvicorn[standard]==0.35.0
+xhtml2pdf==0.2.17

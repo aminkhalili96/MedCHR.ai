@@ -13,7 +13,7 @@
 <!-- Summary Stats -->
 <div class="stats-row">
   <div class="stat-card">
-    <div class="stat-card-value">{{ patients | length }}</div>
+    <div class="stat-card-value">{{ total_patients }}</div>
     <div class="stat-card-label">Total Patients</div>
   </div>
   <div class="stat-card">
@@ -52,7 +52,7 @@
 <div class="card">
   <div class="card-header">
     <h3 class="card-title">Patient Records</h3>
-    <span class="badge badge-neutral">{{ patients | length }} patients</span>
+    <span class="badge badge-neutral">{{ total_patients }} patients</span>
   </div>
   <p style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0 0;">
     Ordered by data richness first (patients with PDF + image + written data are prioritized).
@@ -132,6 +132,43 @@
     </a>
     {% endfor %}
   </div>
+
+  {% if total_pages > 1 %}
+  <!-- Pagination Controls -->
+  <div style="display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 24px; padding: 16px 0;">
+    {% if page > 1 %}
+    <a href="/ui?page={{ page - 1 }}"
+      style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; text-decoration: none; color: #fff; background: #d97756; border: 1px solid #d97756; transition: background 0.15s;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Previous
+    </a>
+    {% else %}
+    <span
+      style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--text-muted); background: var(--bg-tertiary); border: 1px solid var(--border-color); cursor: not-allowed; opacity: 0.5;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Previous
+    </span>
+    {% endif %}
+
+    <span style="font-size: 13px; font-weight: 500; color: var(--text-secondary); padding: 8px 12px;">
+      Page {{ page }} of {{ total_pages }}
+    </span>
+
+    {% if page < total_pages %}
+    <a href="/ui?page={{ page + 1 }}"
+      style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; text-decoration: none; color: #fff; background: #d97756; border: 1px solid #d97756; transition: background 0.15s;">
+      Next
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
+    {% else %}
+    <span
+      style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--text-muted); background: var(--bg-tertiary); border: 1px solid var(--border-color); cursor: not-allowed; opacity: 0.5;">
+      Next
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </span>
+    {% endif %}
+  </div>
+  {% endif %}
   {% else %}
   <div class="empty-state">
     <svg class="empty-state-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"

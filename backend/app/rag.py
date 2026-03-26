@@ -14,7 +14,10 @@ def build_query(structured: dict, notes: str | None = None) -> str:
     return "\n".join(parts)
 
 
-def retrieve_top_chunks(patient_id: str, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+DEFAULT_MIN_SIMILARITY = 0.75  # Cosine distance threshold — reject chunks further than this
+
+
+def retrieve_top_chunks(patient_id: str, query: str, top_k: int = 5, min_similarity: float = DEFAULT_MIN_SIMILARITY) -> List[Dict[str, Any]]:
     embedding = embed_texts([query])[0]
     embedding_dim = len(embedding)
     vector = Vector(embedding)
@@ -55,6 +58,7 @@ def retrieve_top_chunks(patient_id: str, query: str, top_k: int = 5) -> List[Dic
             "content_type": r["content_type"],
         }
         for r in rows
+        if float(r["distance"]) <= min_similarity
     ]
 
 

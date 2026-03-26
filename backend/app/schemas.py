@@ -16,6 +16,13 @@ class Patient(BaseModel):
     notes: Optional[str] = None
     lifestyle: Optional[Dict[str, Any]] = None
     genetics: Optional[Dict[str, Any]] = None
+    gender: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    emergency_contact: Optional[Dict[str, Any]] = None
+    insurance: Optional[Dict[str, Any]] = None
+    social_history: Optional[Dict[str, Any]] = None
+    past_medical_history: Optional[List[Dict[str, Any]]] = None
 
 
 class DocumentCreate(BaseModel):

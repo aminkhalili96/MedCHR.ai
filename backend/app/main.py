@@ -5,11 +5,15 @@ import re
 import secrets
 from urllib.parse import quote
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Form, Depends, status
+import math
+
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Request, Form, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from psycopg.types.json import Json
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -17,43 +21,36 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 from .config import get_settings
-from .db import get_conn, close_pool, clear_tenant_context
+from .db import get_conn, close_pool, clear_tenant_context, set_tenant_context, set_actor_context
 from .schemas import (
     PatientCreate,
     Patient,
     Document,
-    SignedUploadRequest,
-    SignedUploadRegistration,
-    SignedUploadResponse,
-    SignedDownloadResponse,
-    ExtractionResult,
-    ChrDraftRequest,
-    ChrDraft,
-    JobStatus,
-    EmbedResult,
 )
 from .storage import (
-    upload_bytes_via_signed_url,
     download_bytes,
     ensure_bucket,
     storage_health,
-    delete_bytes,
-    create_signed_upload_url,
     create_signed_download_url,
 )
-from .ocr import extract_text
-from .extract import extract_structured
-from .embeddings import embed_texts
-from .rag import build_query, retrieve_top_chunks, retrieve_hybrid
-from .chr import generate_chr_draft, query_chr
-from .jobs import enqueue_job, list_jobs, get_job
+from .rag import build_query, retrieve_top_chunks
+from .chr import query_chr
+from .jobs import enqueue_job, list_jobs
 from .observability import metrics, record_request
 from . import clinical
 from . import gap_features
+from .api_routes import router as api_router
+from .helpers import (
+    _row_to_patient,
+    _row_to_document,
+    _log_action,
+    _upload_document,
+    _extract_document,
+    _embed_document,
+    _draft_chr,
+    _aggregate_structured,
+)
 from .security import (
-    require_api_key,
-    require_read_scope,
-    require_write_scope,
     get_csrf_token,
     validate_csrf_token,
     render_markdown,
@@ -61,10 +58,9 @@ from .security import (
     allowed_hosts,
     cors_origins,
 )
-from .auth import authenticate_user, get_current_user, User, require_admin, get_password_hash
+from .auth import authenticate_user, get_current_user, User, get_password_hash
 from .audit_events import append_audit_event
 from .authz import (
-    require_tenant_id,
     require_permission,
     mark_step_up_verified,
     is_step_up_verified,
@@ -72,8 +68,9 @@ from .authz import (
 from .phi import ensure_phi_processor
 from .server_session import ServerSideSessionMiddleware, renew_session
 from .sso import configure_sso, handle_sso_callback, initiate_sso_login, provision_sso_user
-from .uploads import read_upload_bytes, sanitize_filename, resolve_content_type
 from .ip_whitelist import get_tenant_whitelist, update_tenant_whitelist
+from .alerts import check_critical_values, check_drug_interactions, check_allergy_contraindications, run_safety_checks
+from .report_templates import list_templates
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR.parent.parent / "frontend" / "templates"
@@ -94,6 +91,143 @@ limiter = Limiter(key_func=get_remote_address, default_limits=[settings.rate_lim
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+
+# ---------------------------------------------------------------------------
+# Custom error pages (self-contained HTML, no dependency on base.html)
+# ---------------------------------------------------------------------------
+
+def _error_page_html(status_code: int, title: str, message: str) -> str:
+    """Return a self-contained HTML error page with MedCHR branding."""
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title} - MedCHR.ai</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+  *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #fdf6f1;
+    color: #3a2e2a;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }}
+  .container {{
+    text-align: center;
+    padding: 2rem;
+    max-width: 480px;
+  }}
+  .logo {{
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #d97756;
+    margin-bottom: 2rem;
+    letter-spacing: -0.02em;
+  }}
+  .logo span {{
+    color: #3a2e2a;
+  }}
+  .code {{
+    font-size: 5rem;
+    font-weight: 700;
+    color: #d97756;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }}
+  h1 {{
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+  }}
+  p {{
+    color: #6b5b54;
+    line-height: 1.6;
+    margin-bottom: 2rem;
+  }}
+  a.btn {{
+    display: inline-block;
+    background: #d97756;
+    color: #fff;
+    text-decoration: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: background 0.2s;
+  }}
+  a.btn:hover {{
+    background: #c4623f;
+  }}
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">Med<span>CHR</span>.ai</div>
+    <div class="code">{status_code}</div>
+    <h1>{title}</h1>
+    <p>{message}</p>
+    <a class="btn" href="/ui">Back to Dashboard</a>
+  </div>
+</body>
+</html>"""
+
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Render branded HTML error pages for browser requests; JSON for API clients."""
+    accept = request.headers.get("accept", "")
+    is_browser = "text/html" in accept
+
+    if not is_browser:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+
+    if exc.status_code == 404:
+        html = _error_page_html(
+            404,
+            "Page Not Found",
+            "The page you are looking for does not exist or has been moved.",
+        )
+    elif exc.status_code == 500:
+        html = _error_page_html(
+            500,
+            "Internal Server Error",
+            "Something went wrong on our end. Please try again later or contact support if the problem persists.",
+        )
+    else:
+        html = _error_page_html(
+            exc.status_code,
+            str(exc.detail) if exc.detail else "Error",
+            "An unexpected error occurred.",
+        )
+
+    return HTMLResponse(content=html, status_code=exc.status_code)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Catch-all for unhandled exceptions -- shows a branded 500 page."""
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept:
+        html = _error_page_html(
+            500,
+            "Internal Server Error",
+            "Something went wrong on our end. Please try again later or contact support if the problem persists.",
+        )
+        return HTMLResponse(content=html, status_code=500)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"},
+    )
+
 
 session_kwargs = {
     "secret_key": settings.app_secret_key,
@@ -118,8 +252,16 @@ if origins:
         allow_headers=["Authorization", "Content-Type", "X-API-Key"],
     )
 
+# Mount sub-routers under /api/v1 prefix for versioned API access,
+# while keeping original paths for backward compatibility.
 app.include_router(clinical.router)
+app.include_router(clinical.router, prefix="/api/v1", include_in_schema=False)
 app.include_router(gap_features.router)
+app.include_router(gap_features.router, prefix="/api/v1", include_in_schema=False)
+app.include_router(api_router)
+app.include_router(api_router, prefix="/api/v1", include_in_schema=False)
+
+app.mount("/static", StaticFiles(directory=str(BASE_DIR.parent.parent / "frontend" / "static")), name="static")
 
 
 @app.middleware("http")
@@ -155,8 +297,8 @@ async def session_timeout_middleware(request: Request, call_next):
     session = request.session
     current_time = int(time.time())
     
-    # Auto-login: inject admin user_id if no session exists
-    if not session.get("user_id"):
+    # Auto-login: inject admin user_id if no session exists (dev only)
+    if settings.app_env == "dev" and not session.get("user_id"):
         try:
             with get_conn() as conn:
                 row = conn.execute(
@@ -184,18 +326,37 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["Referrer-Policy"] = settings.referrer_policy
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Cache-Control"] = "no-store"
-    csp = (
-        "default-src 'self'; "
-        "img-src 'self' data:; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-        "font-src 'self' https://fonts.gstatic.com; "
-        f"script-src 'self' 'nonce-{csp_nonce}' https://cdn.jsdelivr.net; "
-        "connect-src 'self'; "
-        "object-src 'none'; "
-        "frame-ancestors 'none'; "
-        "base-uri 'self'; "
-        "form-action 'self'"
-    )
+
+    # Swagger/ReDoc pages use inline scripts and CDN CSS that the strict
+    # nonce-based CSP blocks.  Use a relaxed policy for the docs paths only.
+    _docs_paths = ("/docs", "/redoc", "/openapi.json")
+    if request.url.path in _docs_paths:
+        csp = (
+            "default-src 'self'; "
+            "img-src 'self' data: https://fastapi.tiangolo.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "connect-src 'self'; "
+            "object-src 'none'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        )
+    else:
+        csp = (
+            "default-src 'self'; "
+            "img-src 'self' data:; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            f"script-src 'self' 'nonce-{csp_nonce}' https://cdn.jsdelivr.net; "
+            "connect-src 'self'; "
+            "object-src 'none'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        )
+
     response.headers["Content-Security-Policy"] = csp
     if settings.app_env == "prod" or settings.hipaa_mode:
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
@@ -230,67 +391,20 @@ def startup() -> None:
         if settings.openai_api_key:
             ensure_phi_processor("openai")
     # Ensure the storage bucket exists for uploads
-    ensure_bucket(settings.storage_bucket)
+    try:
+        ensure_bucket(settings.storage_bucket)
+    except Exception as exc:
+        if settings.app_env == "dev":
+            logging.getLogger(__name__).warning(
+                "Supabase storage unavailable — uploads will not work: %s", exc
+            )
+        else:
+            raise
 
 
 @app.on_event("shutdown")
 def shutdown() -> None:
     close_pool()
-
-
-def _row_to_patient(row) -> Patient:
-    return Patient(
-        id=str(row["id"]),
-        full_name=row["full_name"],
-        dob=row.get("dob"),
-        notes=row.get("notes"),
-        lifestyle=row.get("lifestyle") or {},
-        genetics=row.get("genetics") or {},
-    )
-
-
-def _row_to_document(row) -> Document:
-    return Document(
-        id=str(row["id"]),
-        patient_id=str(row["patient_id"]),
-        filename=row["filename"],
-        content_type=row["content_type"],
-        storage_path=row["storage_path"],
-    )
-
-
-def _log_action(conn, patient_id: str | None, action: str, actor: str, details: dict | None = None, tenant_id: str | None = None):
-    if action.startswith("patient."):
-        resource_type = "patient"
-    elif action.startswith("document.") or action.startswith("storage."):
-        resource_type = "document"
-    elif action.startswith("report.") or action.startswith("chr."):
-        resource_type = "chr"
-    elif action.startswith("auth.") or action.startswith("user."):
-        resource_type = "user"
-    else:
-        resource_type = "system"
-
-    try:
-        append_audit_event(
-            conn,
-            action=action,
-            resource_type=resource_type,
-            resource_id=patient_id,
-            details=details or {},
-            tenant_id=tenant_id,
-            actor=actor,
-        )
-    except Exception:
-        # Keep legacy audit_logs write path available for older schemas.
-        pass
-    conn.execute(
-        """
-        INSERT INTO audit_logs (patient_id, actor, action, details, tenant_id)
-        VALUES (%s, %s, %s, %s, %s)
-        """,
-        (patient_id, actor, action, Json(details) if details else None, tenant_id),
-    )
 
 
 @limiter.exempt
@@ -329,746 +443,6 @@ def metrics_endpoint(request: Request):
     return Response(content=body, media_type="text/plain; version=0.0.4")
 
 
-@app.get(
-    "/jobs/{job_id}",
-    response_model=JobStatus,
-    dependencies=[Depends(require_api_key), Depends(require_read_scope)],
-)
-def job_status(request: Request, job_id: str):
-    tenant_id = require_tenant_id(request)
-    actor = getattr(request.state, "actor", "api")
-    job = get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    if job.tenant_id and job.tenant_id != tenant_id:
-        raise HTTPException(status_code=404, detail="Job not found")
-    if job.tenant_id:
-        return JobStatus(job_id=job.id, status=job.status)
-    with get_conn() as conn:
-        allowed = None
-        if job.patient_id:
-            allowed = conn.execute(
-                "SELECT 1 FROM patients WHERE id = %s AND tenant_id = %s",
-                (job.patient_id, tenant_id),
-            ).fetchone()
-        elif job.document_id:
-            allowed = conn.execute(
-                """
-                SELECT 1
-                FROM documents d
-                JOIN patients p ON p.id = d.patient_id
-                WHERE d.id = %s AND p.tenant_id = %s
-                """,
-                (job.document_id, tenant_id),
-            ).fetchone()
-        if not allowed:
-            raise HTTPException(status_code=404, detail="Job not found")
-        _log_action(
-            conn,
-            str(job.patient_id) if job.patient_id else None,
-            "job.status_view",
-            actor,
-            {"job_id": job.id, "status": job.status},
-            tenant_id=tenant_id,
-        )
-        conn.commit()
-        return JobStatus(job_id=job.id, status=job.status)
-    with get_conn() as conn:
-        _log_action(
-            conn,
-            str(job.patient_id) if job.patient_id else None,
-            "job.status_view",
-            actor,
-            {"job_id": job.id, "status": job.status},
-            tenant_id=tenant_id,
-        )
-        conn.commit()
-    return JobStatus(job_id=job.id, status=job.status)
-
-
-@app.post(
-    "/patients",
-    response_model=Patient,
-    dependencies=[Depends(require_api_key), Depends(require_write_scope)],
-)
-def create_patient(payload: PatientCreate, request: Request):
-    actor = getattr(request.state, "actor", "api")
-    tenant_id = require_tenant_id(request)
-    with get_conn() as conn:
-        row = conn.execute(
-            """
-            INSERT INTO patients (tenant_id, full_name, dob, notes)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id, full_name, dob, notes, lifestyle, genetics
-            """,
-            (tenant_id, payload.full_name, payload.dob, payload.notes),
-        ).fetchone()
-        _log_action(conn, str(row["id"]), "patient.create", actor, {"name": payload.full_name}, tenant_id=tenant_id)
-        conn.commit()
-    return _row_to_patient(row)
-
-
-@app.get(
-    "/patients",
-    response_model=list[Patient],
-    dependencies=[Depends(require_api_key), Depends(require_read_scope)],
-)
-def list_patients(request: Request):
-    tenant_id = require_tenant_id(request)
-    actor = getattr(request.state, "actor", "api")
-    with get_conn() as conn:
-        rows = conn.execute(
-            """
-            SELECT id, full_name, dob, notes, lifestyle, genetics
-            FROM patients
-            WHERE tenant_id = %s
-            ORDER BY created_at DESC
-            """,
-            (tenant_id,),
-        ).fetchall()
-        _log_action(
-            conn,
-            None,
-            "patient.list",
-            actor,
-            {"count": len(rows)},
-            tenant_id=tenant_id,
-        )
-        conn.commit()
-    return [_row_to_patient(r) for r in rows]
-
-
-@app.delete(
-    "/patients/{patient_id}",
-    dependencies=[Depends(require_api_key), Depends(require_write_scope)],
-)
-def delete_patient(request: Request, patient_id: str):
-    actor = getattr(request.state, "actor", "api")
-    tenant_id = require_tenant_id(request)
-    with get_conn() as conn:
-        patient = conn.execute(
-            "SELECT id FROM patients WHERE id = %s AND tenant_id = %s",
-            (patient_id, tenant_id),
-        ).fetchone()
-        if not patient:
-            raise HTTPException(status_code=404, detail="Patient not found")
-        rows = conn.execute(
-            "SELECT storage_path FROM documents WHERE patient_id = %s",
-            (patient_id,),
-        ).fetchall()
-        paths = [row["storage_path"] for row in rows]
-        _log_action(conn, patient_id, "patient.delete", actor, {"files": len(paths)}, tenant_id=tenant_id)
-        conn.execute("DELETE FROM patients WHERE id = %s AND tenant_id = %s", (patient_id, tenant_id))
-        conn.commit()
-
-    if paths:
-        try:
-            delete_bytes(settings.storage_bucket, paths)
-        except Exception as exc:
-            with get_conn() as conn:
-                _log_action(
-                    conn,
-                    None,
-                    "storage.delete_failed",
-                    actor,
-                    {"patient_id": patient_id, "error": str(exc)},
-                    tenant_id=tenant_id,
-                )
-                conn.commit()
-            raise
-    return {"status": "deleted", "patient_id": patient_id, "files_deleted": len(paths)}
-
-
-@app.post(
-    "/patients/{patient_id}/documents",
-    response_model=Document,
-    dependencies=[Depends(require_api_key), Depends(require_write_scope)],
-)
-async def upload_document(request: Request, patient_id: str, file: UploadFile = File(...)):
-    actor = getattr(request.state, "actor", "api")
-    tenant_id = require_tenant_id(request)
-    doc = _upload_document(patient_id, file, actor=actor, tenant_id=tenant_id)
-    return doc
-
-
-@app.post(
-    "/patients/{patient_id}/documents/presign-upload",
-    response_model=SignedUploadResponse,
-    dependencies=[Depends(require_api_key), Depends(require_write_scope)],
-)
-def create_document_upload_url(request: Request, patient_id: str, payload: SignedUploadRequest):
-    actor = getattr(request.state, "actor", "api")
-    tenant_id = require_tenant_id(request)
-    return _issue_signed_upload(
-        patient_id,
-        payload.filename,
-        payload.content_type,
-        actor=actor,
-        tenant_id=tenant_id,
-    )
-
-
-@app.post(
-    "/patients/{patient_id}/documents/register-upload",
-    response_model=Document,
-    dependencies=[Depends(require_api_key), Depends(require_write_scope)],
-)
-def register_document_upload(request: Request, patient_id: str, payload: SignedUploadRegistration):
-    actor = getattr(request.state, "actor", "api")
-    tenant_id = require_tenant_id(request)
-    return _register_signed_upload(patient_id, payload, actor=actor, tenant_id=tenant_id)
-
-
-@app.get(
-    "/documents/{document_id}/download-url",
-    response_model=SignedDownloadResponse,
-    dependencies=[Depends(require_api_key), Depends(require_read_scope)],
-)
-def document_download_url(request: Request, document_id: str, expires_in_seconds: int = 300):
-    actor = getattr(request.state, "actor", "api")
-    tenant_id = require_tenant_id(request)
-    ttl = max(60, min(expires_in_seconds, 3600))
-    with get_conn() as conn:
-        row = conn.execute(
-            """
-            SELECT d.id, d.patient_id, d.storage_path
-            FROM documents d
-            JOIN patients p ON p.id = d.patient_id
-            WHERE d.id = %s AND p.tenant_id = %s
-            """,
-            (document_id, tenant_id),
-        ).fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Document not found")
-        download_url = create_signed_download_url(settings.storage_bucket, row["storage_path"], ttl)
-        _log_action(
-            conn,
-            str(row["patient_id"]),
-            "document.download_url_issued",
-            actor,
-            {"document_id": document_id, "expires_in_seconds": ttl},
-            tenant_id=tenant_id,
-        )
-        conn.commit()
-    return SignedDownloadResponse(
-        document_id=str(row["id"]),
-        storage_path=row["storage_path"],
-        download_url=download_url,
-        expires_in_seconds=ttl,
-    )
-
-
-@app.delete(
-    "/documents/{document_id}",
-    dependencies=[Depends(require_api_key), Depends(require_write_scope)],
-)
-def delete_document(request: Request, document_id: str):
-    actor = getattr(request.state, "actor", "api")
-    tenant_id = require_tenant_id(request)
-    with get_conn() as conn:
-        doc = conn.execute(
-            """
-            SELECT id, patient_id, storage_path
-            FROM documents
-            WHERE id = %s
-            """,
-            (document_id,),
-        ).fetchone()
-        if not doc:
-            raise HTTPException(status_code=404, detail="Document not found")
-        allowed = conn.execute(
-            "SELECT 1 FROM patients WHERE id = %s AND tenant_id = %s",
-            (str(doc["patient_id"]), tenant_id),
-        ).fetchone()
-        if not allowed:
-            raise HTTPException(status_code=404, detail="Document not found")
-        _log_action(
-            conn,
-            str(doc["patient_id"]),
-            "document.delete",
-            actor,
-            {"document_id": document_id},
-            tenant_id=tenant_id,
-        )
-        conn.execute("DELETE FROM documents WHERE id = %s", (document_id,))
-        conn.commit()
-
-    try:
-        delete_bytes(settings.storage_bucket, [doc["storage_path"]])
-    except Exception as exc:
-        with get_conn() as conn:
-            _log_action(
-                conn,
-                None,
-                "storage.delete_failed",
-                actor,
-                {"document_id": document_id, "error": str(exc)},
-                tenant_id=tenant_id,
-            )
-            conn.commit()
-        raise
-    return {"status": "deleted", "document_id": document_id}
-
-
-def _upload_document(patient_id: str, file: UploadFile, actor: str = "system", tenant_id: str | None = None) -> Document:
-    filename = sanitize_filename(getattr(file, "filename", "upload.bin"))
-    if hasattr(file, "file"):
-        data, content_type, _size = read_upload_bytes(file)
-    else:
-        data = file
-        content_type = resolve_content_type(filename, None)
-
-    with get_conn() as conn:
-        query = "SELECT id FROM patients WHERE id = %s"
-        params: list[str] = [patient_id]
-        if tenant_id:
-            query += " AND tenant_id = %s"
-            params.append(tenant_id)
-        patient = conn.execute(query, tuple(params)).fetchone()
-        if not patient:
-            raise HTTPException(status_code=404, detail="Patient not found")
-
-        storage_path = f"{patient_id}/{uuid4()}_{filename}"
-        upload_bytes_via_signed_url(settings.storage_bucket, storage_path, data, content_type)
-
-        row = conn.execute(
-            """
-            INSERT INTO documents (patient_id, filename, content_type, storage_path)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id, patient_id, filename, content_type, storage_path
-            """,
-            (patient_id, filename, content_type, storage_path),
-        ).fetchone()
-        _log_action(
-            conn,
-            patient_id,
-            "document.upload",
-            actor,
-            {"document_id": str(row["id"])},
-            tenant_id=tenant_id,
-        )
-        conn.commit()
-
-    return _row_to_document(row)
-
-
-def _validate_storage_path_for_patient(patient_id: str, storage_path: str) -> str:
-    path = storage_path.strip().lstrip("/")
-    if ".." in path:
-        raise HTTPException(status_code=400, detail="Invalid storage path")
-    expected_prefix = f"{patient_id}/"
-    if not path.startswith(expected_prefix):
-        raise HTTPException(status_code=400, detail="Storage path does not belong to patient")
-    return path
-
-
-def _issue_signed_upload(
-    patient_id: str,
-    filename: str,
-    content_type: str | None,
-    *,
-    actor: str,
-    tenant_id: str,
-) -> SignedUploadResponse:
-    safe_filename = sanitize_filename(filename)
-    resolved_content_type = resolve_content_type(safe_filename, content_type)
-    with get_conn() as conn:
-        patient = conn.execute(
-            "SELECT id FROM patients WHERE id = %s AND tenant_id = %s",
-            (patient_id, tenant_id),
-        ).fetchone()
-        if not patient:
-            raise HTTPException(status_code=404, detail="Patient not found")
-
-    storage_path = f"{patient_id}/{uuid4()}_{safe_filename}"
-    signed = create_signed_upload_url(settings.storage_bucket, storage_path)
-    resolved_path = _validate_storage_path_for_patient(patient_id, signed.get("path") or storage_path)
-    with get_conn() as conn:
-        _log_action(
-            conn,
-            patient_id,
-            "document.upload_presigned_issued",
-            actor,
-            {"storage_path": resolved_path},
-            tenant_id=tenant_id,
-        )
-        conn.commit()
-
-    return SignedUploadResponse(
-        patient_id=patient_id,
-        filename=safe_filename,
-        content_type=resolved_content_type,
-        storage_path=resolved_path,
-        upload_url=str(signed["upload_url"]),
-        upload_token=str(signed["token"]),
-    )
-
-
-def _register_signed_upload(
-    patient_id: str,
-    payload: SignedUploadRegistration,
-    *,
-    actor: str,
-    tenant_id: str,
-) -> Document:
-    filename = sanitize_filename(payload.filename)
-    content_type = resolve_content_type(filename, payload.content_type)
-    storage_path = _validate_storage_path_for_patient(patient_id, payload.storage_path)
-    with get_conn() as conn:
-        patient = conn.execute(
-            "SELECT id FROM patients WHERE id = %s AND tenant_id = %s",
-            (patient_id, tenant_id),
-        ).fetchone()
-        if not patient:
-            raise HTTPException(status_code=404, detail="Patient not found")
-        row = conn.execute(
-            """
-            INSERT INTO documents (patient_id, filename, content_type, storage_path)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id, patient_id, filename, content_type, storage_path
-            """,
-            (patient_id, filename, content_type, storage_path),
-        ).fetchone()
-        _log_action(
-            conn,
-            patient_id,
-            "document.upload_registered",
-            actor,
-            {"document_id": str(row["id"]), "storage_path": storage_path},
-            tenant_id=tenant_id,
-        )
-        conn.commit()
-    return _row_to_document(row)
-
-
-@app.post(
-    "/documents/{document_id}/extract",
-    response_model=ExtractionResult | JobStatus,
-    dependencies=[Depends(require_api_key), Depends(require_write_scope)],
-)
-def extract_document(request: Request, document_id: str, async_process: bool = False):
-    actor = getattr(request.state, "actor", "api")
-    tenant_id = require_tenant_id(request)
-    with get_conn() as conn:
-        allowed = conn.execute(
-            """
-            SELECT 1
-            FROM documents d
-            JOIN patients p ON p.id = d.patient_id
-            WHERE d.id = %s AND p.tenant_id = %s
-            """,
-            (document_id, tenant_id),
-        ).fetchone()
-    if not allowed:
-        raise HTTPException(status_code=404, detail="Document not found")
-    if settings.job_queue_enabled or async_process:
-        job_id = enqueue_job(
-            "extract",
-            {"document_id": document_id, "actor": actor, "tenant_id": tenant_id},
-            tenant_id=tenant_id,
-            document_id=document_id,
-        )
-        return JSONResponse({"job_id": job_id, "status": "queued"}, status_code=status.HTTP_202_ACCEPTED)
-    return _extract_document(document_id, actor=actor, tenant_id=tenant_id)
-
-
-def _extract_document(document_id: str, actor: str = "system", tenant_id: str | None = None) -> ExtractionResult:
-    with get_conn() as conn:
-        doc = conn.execute(
-            """
-            SELECT id, patient_id, storage_path, content_type
-            FROM documents
-            WHERE id = %s
-            """,
-            (document_id,),
-        ).fetchone()
-
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
-    if tenant_id:
-        with get_conn() as conn:
-            allowed = conn.execute(
-                "SELECT 1 FROM patients WHERE id = %s AND tenant_id = %s",
-                (str(doc["patient_id"]), tenant_id),
-            ).fetchone()
-        if not allowed:
-            raise HTTPException(status_code=404, detail="Document not found")
-
-    data = download_bytes(settings.storage_bucket, doc["storage_path"])
-    raw_text = extract_text(data, doc["content_type"])
-    # structured is a dict (ExtractionData().dict())
-    structured = extract_structured(raw_text)
-
-    with get_conn() as conn:
-        # 1. Insert into extractions (Legacy/Backup JSONB)
-        extraction_row = conn.execute(
-            """
-            INSERT INTO extractions (document_id, raw_text, structured)
-            VALUES (%s, %s, %s)
-            RETURNING id
-            """,
-            (document_id, raw_text, Json(structured)),
-        ).fetchone()
-        extraction_id = extraction_row["id"]
-
-        # 2. Insert into structured tables
-        patient_id = doc["patient_id"]
-        
-        # Labs
-        if "labs" in structured and structured["labs"]:
-            for lab in structured["labs"]:
-                conn.execute(
-                    """
-                    INSERT INTO lab_results 
-                    (patient_id, extraction_id, test_name, value, unit, flag, reference_range, test_date, panel)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        patient_id, extraction_id, 
-                        lab.get("test_name"), lab.get("value"), lab.get("unit"), 
-                        lab.get("flag"), lab.get("reference_range"), 
-                        lab.get("date"), lab.get("panel")
-                    )
-                )
-
-        # Medications
-        if "medications" in structured and structured["medications"]:
-            for med in structured["medications"]:
-                conn.execute(
-                    """
-                    INSERT INTO medications
-                    (patient_id, extraction_id, name, dosage, frequency, route, start_date, end_date, status)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        patient_id, extraction_id,
-                        med.get("name"), med.get("dosage"), med.get("frequency"),
-                        med.get("route"), med.get("start_date"), med.get("end_date"),
-                        med.get("status", "active")
-                    )
-                )
-
-        # Diagnoses
-        if "diagnoses" in structured and structured["diagnoses"]:
-            for dx in structured["diagnoses"]:
-                conn.execute(
-                    """
-                    INSERT INTO diagnoses
-                    (patient_id, extraction_id, condition, code, status, date_onset)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        patient_id, extraction_id,
-                        dx.get("condition"), dx.get("code"), dx.get("status"),
-                        dx.get("date_onset")
-                    )
-                )
-
-        _log_action(
-            conn,
-            str(doc["patient_id"]),
-            "document.extract",
-            actor,
-            {"document_id": document_id},
-            tenant_id=tenant_id,
-        )
-        conn.commit()
-
-    # Re-validate to return Pydantic model (ExtractionResult expects structured as ExtractionData)
-    # Since schemas were updated, we need to ensure this return value matches.
-    # structured is a dict, ExtractionResult.structured is ExtractionData type.
-    # Pydantic should auto-cast dict to model if passed to constructor.
-    # But currently the return type is ExtractionResult.
-    
-    from .schemas import ExtractionData # Import locally to avoid circulars if any
-    
-    return ExtractionResult(
-        document_id=document_id,
-        raw_text=raw_text,
-        structured=ExtractionData(**structured),
-    )
-
-
-def _chunk_text(text: str):
-    size = settings.chunk_size
-    overlap = settings.chunk_overlap
-    if not text:
-        return []
-    chunks = []
-    start = 0
-    length = len(text)
-    chunk_index = 0
-    while start < length:
-        end = min(start + size, length)
-        raw_chunk = text[start:end]
-        if end < length:
-            last_space = raw_chunk.rfind(" ")
-            if last_space > 0 and last_space > size * 0.6:
-                end = start + last_space
-                raw_chunk = text[start:end]
-        leading_ws = len(raw_chunk) - len(raw_chunk.lstrip())
-        trailing_ws = len(raw_chunk) - len(raw_chunk.rstrip())
-        chunk = raw_chunk.strip()
-        if chunk:
-            chunk_start = start + leading_ws
-            chunk_end = end - trailing_ws
-            chunks.append(
-                {
-                    "chunk_text": chunk,
-                    "chunk_index": chunk_index,
-                    "chunk_start": chunk_start,
-                    "chunk_end": chunk_end,
-                }
-            )
-            chunk_index += 1
-        next_start = end - overlap
-        if next_start <= start:
-            next_start = end
-        start = next_start
-    return chunks
-
-
-@app.post(
-    "/documents/{document_id}/embed",
-    response_model=EmbedResult | JobStatus,
-    dependencies=[Depends(require_api_key), Depends(require_write_scope)],
-)
-def embed_document(request: Request, document_id: str, async_process: bool = False):
-    actor = getattr(request.state, "actor", "api")
-    tenant_id = require_tenant_id(request)
-    with get_conn() as conn:
-        allowed = conn.execute(
-            """
-            SELECT 1
-            FROM documents d
-            JOIN patients p ON p.id = d.patient_id
-            WHERE d.id = %s AND p.tenant_id = %s
-            """,
-            (document_id, tenant_id),
-        ).fetchone()
-    if not allowed:
-        raise HTTPException(status_code=404, detail="Document not found")
-    if settings.job_queue_enabled or async_process:
-        job_id = enqueue_job(
-            "embed",
-            {"document_id": document_id, "actor": actor, "tenant_id": tenant_id},
-            tenant_id=tenant_id,
-            document_id=document_id,
-        )
-        return JSONResponse({"job_id": job_id, "status": "queued"}, status_code=status.HTTP_202_ACCEPTED)
-    return _embed_document(document_id, actor=actor, tenant_id=tenant_id)
-
-
-def _embed_document(document_id: str, actor: str = "system", tenant_id: str | None = None):
-    with get_conn() as conn:
-        row = conn.execute(
-            """
-            SELECT e.id as extraction_id, e.raw_text, d.patient_id
-            FROM extractions e
-            JOIN documents d ON d.id = e.document_id
-            JOIN patients p ON p.id = d.patient_id
-            WHERE e.document_id = %s
-              AND (%s IS NULL OR p.tenant_id = %s)
-            ORDER BY e.created_at DESC
-            LIMIT 1
-            """,
-            (document_id, tenant_id, tenant_id),
-        ).fetchone()
-
-    if not row or not row.get("raw_text"):
-        raise HTTPException(status_code=404, detail="No extraction found for document")
-
-    chunks = _chunk_text(row["raw_text"])
-    if not chunks:
-        raise HTTPException(status_code=400, detail="No text available for embedding")
-    vectors = embed_texts([chunk["chunk_text"] for chunk in chunks])
-
-    with get_conn() as conn:
-        conn.execute("DELETE FROM embeddings WHERE document_id = %s", (document_id,))
-        for chunk, vector in zip(chunks, vectors, strict=False):
-            conn.execute(
-                """
-                INSERT INTO embeddings (document_id, extraction_id, chunk_index, chunk_start, chunk_end, chunk_text, embedding)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    document_id,
-                    row["extraction_id"],
-                    chunk["chunk_index"],
-                    chunk["chunk_start"],
-                    chunk["chunk_end"],
-                    chunk["chunk_text"],
-                    vector,
-                ),
-            )
-        _log_action(
-            conn,
-            str(row["patient_id"]),
-            "document.embed",
-            actor,
-            {"document_id": document_id},
-            tenant_id=tenant_id,
-        )
-        conn.commit()
-
-    return {"document_id": document_id, "chunks": len(chunks)}
-
-
-@app.post(
-    "/chr/draft",
-    response_model=ChrDraft | JobStatus,
-    dependencies=[Depends(require_api_key), Depends(require_write_scope)],
-)
-def draft_chr(request: Request, payload: ChrDraftRequest, async_process: bool = False):
-    actor = getattr(request.state, "actor", "api")
-    tenant_id = require_tenant_id(request)
-    with get_conn() as conn:
-        allowed = conn.execute(
-            "SELECT 1 FROM patients WHERE id = %s AND tenant_id = %s",
-            (payload.patient_id, tenant_id),
-        ).fetchone()
-    if not allowed:
-        raise HTTPException(status_code=404, detail="Patient not found")
-    if settings.job_queue_enabled or async_process:
-        job_id = enqueue_job(
-            "draft_chr",
-            {"patient_id": payload.patient_id, "notes": payload.notes, "actor": actor, "tenant_id": tenant_id},
-            tenant_id=tenant_id,
-            patient_id=payload.patient_id,
-        )
-        return JSONResponse({"job_id": job_id, "status": "queued"}, status_code=status.HTTP_202_ACCEPTED)
-    return _draft_chr(payload.patient_id, payload.notes, actor=actor, tenant_id=tenant_id)
-
-
-def _draft_chr(patient_id: str, notes: str | None, actor: str = "system", tenant_id: str | None = None) -> ChrDraft:
-    structured, _sources = _aggregate_structured(patient_id, tenant_id=tenant_id)
-    if not structured:
-        raise HTTPException(status_code=404, detail="No extraction found for patient")
-
-    query_payload = dict(structured)
-    query_payload.pop("documents", None)
-    query = build_query(query_payload, notes)
-    context_chunks = retrieve_hybrid(patient_id, query, top_k=5)
-    draft = generate_chr_draft(query_payload, notes, context_chunks)
-
-    with get_conn() as conn:
-        conn.execute(
-            """
-            INSERT INTO chr_versions (patient_id, draft, status)
-            VALUES (%s, %s, %s)
-            """,
-            (patient_id, Json(draft), "draft"),
-        )
-        _log_action(conn, patient_id, "chr.draft", actor, {"chunks": len(context_chunks)}, tenant_id=tenant_id)
-        conn.commit()
-
-    return ChrDraft(
-        patient_id=patient_id,
-        draft=draft,
-        citations=draft.get("citations", []),
-    )
-
-
 # -------------------- UI --------------------
 
 def _require_ui_user(request: Request) -> User | None:
@@ -1076,7 +450,9 @@ def _require_ui_user(request: Request) -> User | None:
         return get_current_user(request)
     except Exception:
         pass
-    # Always auto-authenticate as first admin user (no login required)
+    # Auto-authenticate as first admin user in dev mode only
+    if settings.app_env != "dev":
+        return None
     try:
         with get_conn() as conn:
             row = conn.execute(
@@ -1312,6 +688,32 @@ def mfa_enable(
     )
 
 
+@app.get("/ui/login", response_class=HTMLResponse, include_in_schema=False)
+def login_page(request: Request):
+    """Render login page. In dev mode, redirect straight to dashboard."""
+    if settings.app_env == "dev":
+        return RedirectResponse("/ui", status_code=303)
+    return templates.TemplateResponse(
+        "login.html",
+        {"request": request, "csrf_token": get_csrf_token(request), "csp_nonce": getattr(request.state, "csp_nonce", "")},
+    )
+
+
+@limiter.limit("10/minute")
+@app.post("/ui/login", response_class=HTMLResponse, include_in_schema=False)
+def login_submit(request: Request, email: str = Form(...), password: str = Form(...), csrf_token: str = Form(...)):
+    """Handle login form submission."""
+    validate_csrf_token(request, csrf_token)
+    try:
+        user = authenticate_user(email, password)
+        if user:
+            request.session["user_id"] = str(user.id)
+            return RedirectResponse("/ui", status_code=303)
+    except Exception:
+        pass
+    return RedirectResponse("/ui/login?error=invalid", status_code=303)
+
+
 @app.get("/ui/logout", include_in_schema=False)
 def logout(request: Request):
     request.session.clear()
@@ -1487,12 +889,48 @@ async def sso_callback(request: Request, provider: str):
 
 
 @app.get("/ui", response_class=HTMLResponse, include_in_schema=False)
-def ui_patients(request: Request):
+def ui_patients(request: Request, page: int = Query(1, ge=1)):
     user = _require_ui_user(request)
     if not user:
         return RedirectResponse("/ui/login", status_code=303)
 
+    per_page = 25
+
     with get_conn() as conn:
+        # Total patient count and aggregate stats (for stats cards)
+        totals = conn.execute(
+            """
+            SELECT
+                COUNT(DISTINCT p.id) AS total_patients,
+                COUNT(d.id) AS total_docs
+            FROM patients p
+            LEFT JOIN documents d ON p.id = d.patient_id
+            WHERE p.tenant_id = %s
+            """,
+            (user.tenant_id,),
+        ).fetchone()
+        total_patients = int(totals["total_patients"] or 0)
+        total_docs = int(totals["total_docs"] or 0)
+        total_pages = max(1, math.ceil(total_patients / per_page))
+
+        # Clamp page to valid range
+        if page > total_pages:
+            page = total_pages
+        offset = (page - 1) * per_page
+
+        # Total reports count
+        report_count_row = conn.execute(
+            """
+            SELECT COUNT(DISTINCT cv.patient_id) AS report_count
+            FROM chr_versions cv
+            JOIN patients p ON p.id = cv.patient_id
+            WHERE p.tenant_id = %s
+            """,
+            (user.tenant_id,),
+        ).fetchone()
+        report_count = int(report_count_row["report_count"] or 0)
+
+        # Paginated patient rows (same query + LIMIT/OFFSET)
         rows = conn.execute(
             """
             SELECT
@@ -1537,15 +975,67 @@ def ui_patients(request: Request):
                    ) DESC,
                    doc_count DESC,
                    p.created_at DESC
+            LIMIT %s OFFSET %s
             """,
-            (user.tenant_id,)
+            (user.tenant_id, per_page, offset),
         ).fetchall()
 
-        # Get report status per patient
+        # Multimodal patients (featured demo section) — always fetched in full
+        multimodal_rows = conn.execute(
+            """
+            SELECT
+                   p.id,
+                   p.full_name,
+                   COUNT(d.id) AS doc_count,
+                   COUNT(*) FILTER (
+                     WHERE POSITION('pdf' IN COALESCE(lower(d.content_type), '')) > 0
+                        OR RIGHT(lower(COALESCE(d.filename, '')), 4) = '.pdf'
+                   ) AS pdf_count,
+                   COUNT(*) FILTER (
+                     WHERE LEFT(COALESCE(lower(d.content_type), ''), 6) = 'image/'
+                        OR lower(COALESCE(d.filename, '')) ~ '\\.(png|jpg|jpeg|gif|bmp|webp|tif|tiff)$'
+                   ) AS image_count,
+                   COUNT(*) FILTER (
+                     WHERE LEFT(COALESCE(lower(d.content_type), ''), 5) = 'text/'
+                        OR lower(COALESCE(d.filename, '')) ~ '\\.(txt|md|rtf|csv|tsv|json|xml)$'
+                   ) AS text_count
+            FROM patients p
+            LEFT JOIN documents d ON p.id = d.patient_id
+            WHERE p.tenant_id = %s
+            GROUP BY p.id, p.full_name
+            HAVING
+                   COUNT(*) FILTER (
+                     WHERE POSITION('pdf' IN COALESCE(lower(d.content_type), '')) > 0
+                        OR RIGHT(lower(COALESCE(d.filename, '')), 4) = '.pdf'
+                   ) > 0
+                   AND COUNT(*) FILTER (
+                     WHERE LEFT(COALESCE(lower(d.content_type), ''), 6) = 'image/'
+                        OR lower(COALESCE(d.filename, '')) ~ '\\.(png|jpg|jpeg|gif|bmp|webp|tif|tiff)$'
+                   ) > 0
+                   AND COUNT(*) FILTER (
+                     WHERE LEFT(COALESCE(lower(d.content_type), ''), 5) = 'text/'
+                        OR lower(COALESCE(d.filename, '')) ~ '\\.(txt|md|rtf|csv|tsv|json|xml)$'
+                   ) > 0
+            ORDER BY doc_count DESC
+            """,
+            (user.tenant_id,),
+        ).fetchall()
+        multimodal_patients = [
+            {
+                "id": str(mr["id"]),
+                "full_name": mr["full_name"],
+                "doc_count": int(mr["doc_count"] or 0),
+                "pdf_count": int(mr["pdf_count"] or 0),
+                "image_count": int(mr["image_count"] or 0),
+                "text_count": int(mr["text_count"] or 0),
+            }
+            for mr in multimodal_rows
+        ]
+
+        # Get report status and data profiles for the current page
         report_statuses = {}
         doc_counts = {}
         data_profiles = {}
-        multimodal_patients = []
         for r in rows:
             pid = str(r["id"])
             pdf_count = int(r.get("pdf_count") or 0)
@@ -1564,22 +1054,9 @@ def ui_patients(request: Request):
             ).fetchone()
             report_statuses[pid] = draft["status"] if draft else None
             doc_counts[pid] = int(r["doc_count"] or 0)
-            if has_all_data_types:
-                multimodal_patients.append(
-                    {
-                        "id": pid,
-                        "full_name": r["full_name"],
-                        "doc_count": int(r["doc_count"] or 0),
-                        "pdf_count": pdf_count,
-                        "image_count": image_count,
-                        "text_count": text_count,
-                    }
-                )
 
     patients = [_row_to_patient(r) for r in rows]
     dev_mode = request.session.get("dev_mode", False)
-    report_count = sum(1 for v in report_statuses.values() if v is not None)
-    total_docs = sum(doc_counts.values())
     return _render_template(
         request,
         "patients.html",
@@ -1591,9 +1068,13 @@ def ui_patients(request: Request):
             "doc_counts": doc_counts,
             "report_count": report_count,
             "total_docs": total_docs,
+            "total_patients": total_patients,
             "data_profiles": data_profiles,
             "multimodal_patients": multimodal_patients,
             "multimodal_count": len(multimodal_patients),
+            "page": page,
+            "total_pages": total_pages,
+            "per_page": per_page,
         },
     )
 
@@ -1902,165 +1383,6 @@ def _latest_extraction(patient_id: str, tenant_id: str | None = None):
             ).fetchone()
 
 
-def _aggregate_structured(patient_id: str, tenant_id: str | None = None) -> tuple[dict | None, list[dict]]:
-    with get_conn() as conn:
-        if tenant_id:
-            rows = conn.execute(
-                """
-                SELECT
-                    d.id as document_id,
-                    d.filename,
-                    d.content_type,
-                    d.created_at as document_created_at,
-                    e.id as extraction_id,
-                    e.structured,
-                    e.raw_text,
-                    e.created_at as extracted_at
-                FROM documents d
-                JOIN patients p ON p.id = d.patient_id
-                JOIN LATERAL (
-                    SELECT id, structured, raw_text, created_at
-                    FROM extractions
-                    WHERE document_id = d.id
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                ) e ON true
-                WHERE d.patient_id = %s
-                  AND p.tenant_id = %s
-                ORDER BY d.created_at DESC
-                """,
-                (patient_id, tenant_id),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                """
-                SELECT
-                    d.id as document_id,
-                    d.filename,
-                    d.content_type,
-                    d.created_at as document_created_at,
-                    e.id as extraction_id,
-                    e.structured,
-                    e.raw_text,
-                    e.created_at as extracted_at
-                FROM documents d
-                JOIN LATERAL (
-                    SELECT id, structured, raw_text, created_at
-                    FROM extractions
-                    WHERE document_id = d.id
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                ) e ON true
-                WHERE d.patient_id = %s
-                ORDER BY d.created_at DESC
-                """,
-                (patient_id,),
-            ).fetchall()
-
-    if not rows:
-        return None, []
-
-    labs: list[dict] = []
-    diagnoses: list[str] = []
-    medications: list[str] = []
-    procedures: list[str] = []
-    genetics: list[dict] = []
-    notes_parts: list[str] = []
-    sources: list[dict] = []
-
-    seen_labs: set[tuple] = set()
-    seen_dx: set[str] = set()
-    seen_meds: set[str] = set()
-    seen_proc: set[str] = set()
-    seen_gen: set[tuple] = set()
-
-    for row in rows:
-        structured = row.get("structured") or {}
-        sources.append(
-            {
-                "document_id": str(row["document_id"]),
-                "filename": row["filename"],
-                "content_type": row["content_type"],
-                "extraction_id": str(row["extraction_id"]),
-                "extracted_at": row["extracted_at"].isoformat() if row.get("extracted_at") else None,
-            }
-        )
-
-        for lab in structured.get("labs") or structured.get("biomarkers") or []:
-            if not isinstance(lab, dict):
-                continue
-            key = (
-                lab.get("panel"),
-                lab.get("test"),
-                lab.get("value"),
-                lab.get("unit"),
-                lab.get("range"),
-                lab.get("flag"),
-            )
-            if key in seen_labs:
-                continue
-            seen_labs.add(key)
-            labs.append(lab)
-
-        for dx in structured.get("diagnoses") or []:
-            dx_str = dx.get("condition") if isinstance(dx, dict) else dx if isinstance(dx, str) else None
-            if not dx_str:
-                continue
-            key = dx_str.strip().lower()
-            if not key or key in seen_dx:
-                continue
-            seen_dx.add(key)
-            diagnoses.append(dx_str)
-
-        for med in structured.get("medications") or []:
-            med_str = med.get("name") if isinstance(med, dict) else med if isinstance(med, str) else None
-            if not med_str:
-                continue
-            key = med_str.strip().lower()
-            if not key or key in seen_meds:
-                continue
-            seen_meds.add(key)
-            medications.append(med_str)
-
-        for proc in structured.get("procedures") or []:
-            if not isinstance(proc, str):
-                continue
-            key = proc.strip().lower()
-            if not key or key in seen_proc:
-                continue
-            seen_proc.add(key)
-            procedures.append(proc)
-
-        for gene in structured.get("genetics") or []:
-            if not isinstance(gene, dict):
-                continue
-            key = (gene.get("gene"), gene.get("variant"), gene.get("impact"))
-            if key in seen_gen:
-                continue
-            seen_gen.add(key)
-            genetics.append(gene)
-
-        note = structured.get("notes") or ""
-        if note:
-            notes_parts.append(f"{row['filename']}: {note}")
-
-    combined_notes = "\n".join(notes_parts)
-    if len(combined_notes) > settings.aggregate_notes_max_chars:
-        combined_notes = combined_notes[: settings.aggregate_notes_max_chars] + "…"
-
-    aggregated = {
-        "labs": labs,
-        "biomarkers": labs,
-        "diagnoses": diagnoses,
-        "medications": medications,
-        "procedures": procedures,
-        "genetics": genetics,
-        "notes": combined_notes,
-        "documents": sources,
-    }
-    return aggregated, sources
-
-
 def _draft_payload(draft_row) -> dict:
     if not draft_row:
         return {}
@@ -2286,10 +1608,86 @@ def ui_patient_report(request: Request, patient_id: str):
     if not patient_row:
         raise HTTPException(status_code=404, detail="Patient not found")
 
-    structured, _sources = _aggregate_structured(patient_id, tenant_id=str(user.tenant_id))
+    tenant_id = str(user.tenant_id)
+    structured, _sources = _aggregate_structured(patient_id, tenant_id=tenant_id)
     labs = _normalize_labs(structured)
-    meds = structured.get("medications") if structured else []
-    diagnoses = structured.get("diagnoses") if structured else []
+    meds = (structured.get("medications") or []) if structured else []
+    diagnoses = (structured.get("diagnoses") or []) if structured else []
+    allergies_raw = (structured.get("allergies") or []) if structured else []
+    vitals_raw = (structured.get("vitals") or []) if structured else []
+    extraction_quality = structured.get("extraction_quality") if structured else None
+
+    # Phase 1: Fetch allergies and vitals from dedicated tables
+    with get_conn() as conn:
+        allergy_rows = conn.execute(
+            "SELECT substance, reaction, severity, status FROM allergies WHERE patient_id = %s",
+            (patient_id,),
+        ).fetchall()
+        vital_rows = conn.execute(
+            "SELECT type, value_1, value_2, unit, recorded_at FROM vitals WHERE patient_id = %s ORDER BY recorded_at DESC LIMIT 20",
+            (patient_id,),
+        ).fetchall()
+
+    # Merge allergies: from extraction + from dedicated table (deduplicated)
+    seen_allergies = set()
+    combined_allergies = []
+    for a in allergy_rows:
+        key = (a["substance"] or "").lower()
+        if key and key not in seen_allergies:
+            seen_allergies.add(key)
+            combined_allergies.append({
+                "substance": a["substance"],
+                "reaction": a.get("reaction") or "",
+                "severity": a.get("severity") or "",
+                "status": a.get("status") or "active",
+            })
+    for a in allergies_raw:
+        key = (a.get("substance") or "").lower()
+        if key and key not in seen_allergies:
+            seen_allergies.add(key)
+            combined_allergies.append(a)
+
+    # Normalize vitals from DB rows
+    combined_vitals = []
+    for v in vital_rows:
+        val = str(v["value_1"])
+        if v.get("value_2"):
+            val = f"{v['value_1']}/{v['value_2']}"
+        combined_vitals.append({
+            "type": v["type"],
+            "value": val,
+            "unit": v.get("unit") or "",
+            "recorded_at": str(v["recorded_at"])[:16] if v.get("recorded_at") else "",
+        })
+    # Also include vitals from extraction if no DB vitals
+    if not combined_vitals and vitals_raw:
+        for v in vitals_raw:
+            combined_vitals.append({
+                "type": v.get("type") or "",
+                "value": v.get("value") or "",
+                "unit": v.get("unit") or "",
+                "recorded_at": v.get("date") or "",
+            })
+
+    # Phase 1: Run safety checks
+    med_names = []
+    for m in meds:
+        if isinstance(m, dict):
+            med_names.append(m.get("name") or "")
+        elif isinstance(m, str):
+            med_names.append(m)
+    allergy_names = [a.get("substance", "") for a in combined_allergies]
+    raw_labs = (structured.get("labs") or []) if structured else []
+    safety_alerts = run_safety_checks(
+        labs=raw_labs,
+        medications=med_names,
+        allergies=allergy_names,
+    )
+
+    # Extraction confidence
+    overall_confidence = None
+    if extraction_quality and isinstance(extraction_quality, dict):
+        overall_confidence = extraction_quality.get("overall_confidence")
 
     draft_row = _latest_draft(patient_id)
     report_edits = draft_row.get("report_edits") if draft_row else {}
@@ -2321,19 +1719,83 @@ def ui_patient_report(request: Request, patient_id: str):
         render_markdown(process_citations(edited_interpretation)) if edited_interpretation else ""
     )
 
-    documents = _list_documents(patient_id, tenant_id=str(user.tenant_id))
+    documents = _list_documents(patient_id, tenant_id=tenant_id)
     findings = _key_findings(labs)
 
+    # Build patient social/lifestyle context
+    patient_obj = _row_to_patient(patient_row)
+    lifestyle = patient_obj.lifestyle or {}
+    # Merge social_history from patient row and lifestyle
+    social_history = patient_obj.social_history or {}
+    if lifestyle and not social_history:
+        social_history = lifestyle
+
+    # Phase 2: Fetch clinical sections from new tables (graceful fallback if tables don't exist)
+    encounters = []
+    pmh_records = []
+    family_history_records = []
+    treatment_plans = []
+    ros_records = []
+    try:
+        with get_conn() as conn:
+            encounters = conn.execute(
+                """SELECT encounter_date, encounter_type, chief_complaint, hpi, provider_name, status
+                FROM encounters WHERE patient_id = %s AND tenant_id = %s
+                ORDER BY encounter_date DESC LIMIT 5""",
+                (patient_id, tenant_id),
+            ).fetchall()
+            pmh_records = conn.execute(
+                """SELECT history_type, condition, icd_code, date_onset, date_resolved, status
+                FROM clinical_history WHERE patient_id = %s AND tenant_id = %s
+                ORDER BY date_onset DESC""",
+                (patient_id, tenant_id),
+            ).fetchall()
+            family_history_records = conn.execute(
+                """SELECT relation, condition, age_at_onset, is_deceased, notes
+                FROM family_history WHERE patient_id = %s AND tenant_id = %s""",
+                (patient_id, tenant_id),
+            ).fetchall()
+            treatment_plans = conn.execute(
+                """SELECT plan_type, description, priority, status, target_date, created_by
+                FROM treatment_plans WHERE patient_id = %s AND tenant_id = %s
+                ORDER BY created_at DESC LIMIT 10""",
+                (patient_id, tenant_id),
+            ).fetchall()
+            ros_records = conn.execute(
+                """SELECT system_name, findings, is_positive, notes
+                FROM review_of_systems WHERE patient_id = %s AND tenant_id = %s
+                ORDER BY system_name""",
+                (patient_id, tenant_id),
+            ).fetchall()
+    except Exception:
+        # Tables may not exist yet if migration hasn't run
+        pass
+
     with get_conn() as conn:
-        _log_action(conn, patient_id, "report.view", user.email, {"ip": request.client.host}, tenant_id=str(user.tenant_id))
+        _log_action(conn, patient_id, "report.view", user.email, {"ip": request.client.host}, tenant_id=tenant_id)
         conn.commit()
+
+    # Available specialty templates
+    specialty_templates = list_templates()
+
+    # Combine PMH from structured patient field + clinical_history table
+    combined_pmh = list(patient_obj.past_medical_history or [])
+    for rec in pmh_records:
+        combined_pmh.append({
+            "type": rec.get("history_type", "medical"),
+            "condition": rec["condition"],
+            "icd_code": rec.get("icd_code"),
+            "onset": str(rec["date_onset"]) if rec.get("date_onset") else None,
+            "resolved": str(rec["date_resolved"]) if rec.get("date_resolved") else None,
+            "status": rec.get("status", "historical"),
+        })
 
     return _render_template(
         request,
         "report.html",
         {
             "user": user.email if user else "System",
-            "patient": _row_to_patient(patient_row),
+            "patient": patient_obj,
             "draft": draft_row,
             "summary": summary,
             "summary_html": summary_html,
@@ -2345,8 +1807,59 @@ def ui_patient_report(request: Request, patient_id: str):
             "findings": findings,
             "edited_interpretation_html": edited_interpretation_html,
             "edited_by": edited_by,
+            # Phase 1 additions
+            "allergies": combined_allergies,
+            "vitals": combined_vitals,
+            "safety_alerts": safety_alerts,
+            "overall_confidence": overall_confidence,
+            "social_history": social_history,
+            "specialty_templates": specialty_templates,
+            # Phase 2 additions
+            "encounters": encounters,
+            "past_medical_history": combined_pmh,
+            "family_history": family_history_records,
+            "treatment_plans": treatment_plans,
+            "review_of_systems": ros_records,
         },
     )
+
+@app.get("/ui/patients/{patient_id}/report/pdf", include_in_schema=False)
+def ui_patient_report_pdf(request: Request, patient_id: str):
+    """Generate PDF version of the CHR report."""
+    user = _require_ui_user(request)
+    if not user:
+        return RedirectResponse("/ui/login", status_code=303)
+
+    # Render the report HTML first
+    report_html_response = ui_patient_report(request, patient_id)
+    html_content = report_html_response.body.decode("utf-8") if hasattr(report_html_response, "body") else str(report_html_response)
+
+    try:
+        from io import BytesIO
+        from xhtml2pdf import pisa
+
+        pdf_buffer = BytesIO()
+        pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer)
+
+        if pisa_status.err:
+            raise HTTPException(status_code=500, detail="PDF generation failed")
+
+        pdf_buffer.seek(0)
+        patient_row = _get_patient(patient_id, tenant_id=str(user.tenant_id))
+        patient_name = patient_row["full_name"].replace(" ", "_") if patient_row else "patient"
+        filename = f"CHR_{patient_name}_{patient_id[:8]}.pdf"
+
+        with get_conn() as conn:
+            _log_action(conn, patient_id, "report.pdf_export", user.email, {"ip": request.client.host}, tenant_id=str(user.tenant_id))
+            conn.commit()
+
+        return Response(
+            content=pdf_buffer.getvalue(),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except ImportError:
+        raise HTTPException(status_code=501, detail="PDF export not available. Install xhtml2pdf: pip install xhtml2pdf")
 
 
 @app.get("/ui/patients/{patient_id}/report/share", response_class=HTMLResponse, include_in_schema=False)
@@ -2375,7 +1888,7 @@ def ui_patient_report_share(request: Request, patient_id: str):
 
     structured, _sources = _aggregate_structured(patient_id, tenant_id=str(user.tenant_id))
     labs = _normalize_labs(structured)
-    diagnoses = structured.get("diagnoses") if structured else []
+    diagnoses = (structured.get("diagnoses") or []) if structured else []
     if isinstance(report_edits, dict):
         if isinstance(report_edits.get("labs"), list):
             labs = report_edits.get("labs") or labs
@@ -2572,8 +2085,8 @@ def ui_query_report(
     # Render the same report page with query results
     structured, _sources = _aggregate_structured(patient_id, tenant_id=str(user.tenant_id))
     labs = _normalize_labs(structured)
-    meds = structured.get("medications") if structured else []
-    diagnoses = structured.get("diagnoses") if structured else []
+    meds = (structured.get("medications") or []) if structured else []
+    diagnoses = (structured.get("diagnoses") or []) if structured else []
     if isinstance(report_edits, dict):
         if isinstance(report_edits.get("labs"), list):
             labs = report_edits.get("labs") or labs
