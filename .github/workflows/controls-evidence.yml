@@ -1,8 +1,7 @@
 name: Controls Evidence Report
 
 on:
-  schedule:
-    - cron: "0 10 1 * *"
+  # Scheduled evidence generation is disabled while this project is inactive.
   workflow_dispatch:
 
 jobs:
