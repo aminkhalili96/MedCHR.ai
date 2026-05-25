@@ -1,8 +1,7 @@
 name: Dependency Refresh
 
 on:
-  schedule:
-    - cron: "0 9 * * 1"
+  # Scheduled refresh is disabled while this project is inactive.
   workflow_dispatch:
 
 jobs:
